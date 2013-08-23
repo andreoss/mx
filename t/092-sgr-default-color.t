@@ -1,0 +1,4 @@
+@ 11x1
+< \e[31mRED\e[39mDEFAULT\e[0m
+
+> REDDEFAULT木

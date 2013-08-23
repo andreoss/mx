@@ -1,0 +1,4 @@
+@ 20x1
+< \e[1;31mBOLD_RED\e[0m \e[1;4mBOLD_UNDER\e[0m
+
+> BOLD_RED BOLD_UNDER木

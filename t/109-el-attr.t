@@ -1,0 +1,4 @@
+@ 10x1
+< \e[1;31mBOLD_RED\e[KX
+
+> BOLD_REDX木

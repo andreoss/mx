@@ -1,0 +1,4 @@
+@ 7x1
+< ABC\e7DEF\e8XXX
+
+> ABCXXX木

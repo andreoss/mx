@@ -1,0 +1,4 @@
+@ 10x1
+< ABC\e7DEF\e8GHI\e7JKL\e8MNO
+
+> ABCGHIMNO木

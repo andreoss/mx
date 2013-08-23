@@ -1,0 +1,5 @@
+mx - a minimal X11 terminal emulator.
+
+Build:  make
+Run:    ./bin/mx
+Test:   make test

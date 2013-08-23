@@ -1,0 +1,4 @@
+@ 9x1
+< MAIN\e[?1049hALT\e[?1049lBACK
+
+> MAINBACK木

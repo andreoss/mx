@@ -1,0 +1,4 @@
+@ 16x1
+< \e[38;5mINVALID\e[0m \e[48;2;255mPARTIAL\e[0m
+
+> INVALID PARTIAL木

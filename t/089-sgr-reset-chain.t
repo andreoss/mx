@@ -1,0 +1,4 @@
+@ 18x1
+< \e[1;31mBOLD_RED\e[0m\e[32mGREEN\e[0m\e[0m\e[34mBLUE\e[0m
+
+> BOLD_REDGREENBLUE木

@@ -566,13 +566,25 @@ static void cairo_free(void *ctx)
     free(b);
 }
 
+static int cell_width(const CairoBackend *b)
+{
+    int w = (int) roundf((float) b->char_width * b->font_scale);
+    return w < 1 ? 1 : w;
+}
+
+static int cell_height(const CairoBackend *b)
+{
+    int h = (int) roundf((float) b->char_height * b->font_scale);
+    return h < 1 ? 1 : h;
+}
+
 static void cairo_resize(void *ctx, int cols, int rows)
 {
     CairoBackend *b = ctx;
     b->cols = cols;
     b->rows = rows;
-    int cw = (int) roundf((float) b->char_width * b->font_scale);
-    int ch = (int) roundf((float) b->char_height * b->font_scale);
+    int cw = cell_width(b);
+    int ch = cell_height(b);
     b->expected_width = 2 * b->border_px + cols * cw;
     b->expected_height = 2 * b->border_px + rows * ch;
 
@@ -646,14 +658,12 @@ static void cairo_resize_window(void *ctx, int winw, int winh)
 
 static int cairo_char_width(void *ctx)
 {
-    CairoBackend *b = ctx;
-    return MAX(1, (int) roundf((float) b->char_width * b->font_scale));
+    return cell_width(ctx);
 }
 
 static int cairo_char_height(void *ctx)
 {
-    CairoBackend *b = ctx;
-    return MAX(1, (int) roundf((float) b->char_height * b->font_scale));
+    return cell_height(ctx);
 }
 
 static int cairo_border(void *ctx)
@@ -664,20 +674,13 @@ static int cairo_border(void *ctx)
 static int cairo_expected_width(void *ctx)
 {
     CairoBackend *b = ctx;
-    return 2 * b->border_px + b->cols * MAX(1, (int) roundf((float)
-							    b->char_width *
-							    b->
-							    font_scale));
+    return 2 * b->border_px + b->cols * cell_width(b);
 }
 
 static int cairo_expected_height(void *ctx)
 {
     CairoBackend *b = ctx;
-    return 2 * b->border_px + b->rows * MAX(1, (int) roundf((float)
-							    b->char_height
-							    *
-							    b->
-							    font_scale));
+    return 2 * b->border_px + b->rows * cell_height(b);
 }
 
 static int cairo_actual_width(void *ctx)
@@ -780,7 +783,7 @@ draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	return;
 
     unsigned int count;
-    double scaled_w = b->char_width * b->font_scale;
+    double scaled_w = cell_width(b);
     double base_y = py + b->char_ascent * b->font_scale;
 
     count = 0;
@@ -882,8 +885,8 @@ cairo_frame(void *ctx, const Screen *s,
 {
     CairoBackend *b = ctx;
     int x, y, cols = b->cols, rows = b->rows;
-    int ch = (int) roundf((float) b->char_height * b->font_scale);
-    int cw = (int) roundf((float) b->char_width * b->font_scale);
+    int ch = cell_height(b);
+    int cw = cell_width(b);
     int bp = b->border_px;
     int shape = cursor_shape;
     int cursor_hidden = (mode & MODE_HIDE) != 0;
@@ -1853,8 +1856,8 @@ cairo_draw_block_borders(CairoBackend *b, cairo_t *draw, const Screen *s)
     if (!(b->flags & CAIRO_BORDER_BLOCKS))
 	return;
     int cols = b->cols, rows = b->rows;
-    int cw = (int) roundf((float) b->char_width * b->font_scale);
-    int ch = (int) roundf((float) b->char_height * b->font_scale);
+    int cw = cell_width(b);
+    int ch = cell_height(b);
     int bp = b->border_px;
 
     border_cache_refresh(b, s);

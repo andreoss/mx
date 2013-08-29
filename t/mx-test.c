@@ -29,15 +29,27 @@ static const char *default_colourname[] = {
 static const unsigned int default_fg = 256;
 static const unsigned int default_bg = 257;
 
+static char replybuf[8192];
+static size_t replylen;
+
 static void write_cb(const char *buf, size_t len, void *user)
 {
-    UNUSED(buf);
-    UNUSED(len);
     UNUSED(user);
+    for (size_t i = 0; i < len && replylen < sizeof(replybuf) - 1; i++)
+	replybuf[replylen++] = buf[i];
+    replybuf[replylen] = '\0';
 }
 
 static int show_cursor_marker;
 static Palette *dump_pal;
+
+static void dump_reply(const Term *term)
+{
+    UNUSED(term);
+    for (size_t i = 0; i < replylen; i++)
+	printf("%02X", (unsigned char) replybuf[i]);
+    putchar('\n');
+}
 
 static void dump_text(const Term *term)
 {
@@ -182,6 +194,8 @@ int main(int argc, char *argv[])
 	    outs[nouts++] = dump_mode;
 	} else if (strcmp(argv[i], "title") == 0) {
 	    outs[nouts++] = dump_title;
+	} else if (strcmp(argv[i], "reply") == 0) {
+	    outs[nouts++] = dump_reply;
 	} else {
 	    fprintf(stderr, "mx-test: unknown output mode %s\n", argv[i]);
 	    return 1;

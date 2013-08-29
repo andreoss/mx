@@ -1027,30 +1027,35 @@ static void str_handle(Term *t, const Event *ev)
 		    if (t->clip[0]) {
 			int clip_len = (int) strlen(t->clip);
 			char resp[4096 + 64];
+			static const char b64[] =
+			    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			    "abcdefghijklmnopqrstuvwxyz"
+			    "0123456789+/";
 			int n = snprintf(resp, sizeof(resp),
 					 "\033]52;%s;", args[1]);
-			for (int i = 0; i < clip_len; i++) {
-			    static const char b64[] =
-				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				"abcdefghijklmnopqrstuvwxyz"
-				"0123456789+/";
-			    uint8_t c = (uint8_t) t->clip[i];
-			    resp[n++] = b64[c >> 2];
-			    resp[n++] = b64[((c & 3) << 4) |
-					    (i + 1 < clip_len ?
-					     ((uint8_t) t->
-					      clip[i + 1] >> 4)
-					     : 0)];
-			    if (++i >= clip_len) {
-				resp[n++] = '=';
-				resp[n++] = '=';
-			    } else {
-				c = (uint8_t) t->clip[i];
-				resp[n++] =
-				    b64[((t->clip[i - 1] & 3) << 2) |
-					(c >> 6)];
-				resp[n++] = b64[c & 63];
-			    }
+			int i;
+			for (i = 0; i + 3 <= clip_len; i += 3) {
+			    uint8_t b0 = (uint8_t) t->clip[i];
+			    uint8_t b1 = (uint8_t) t->clip[i + 1];
+			    uint8_t b2 = (uint8_t) t->clip[i + 2];
+			    resp[n++] = b64[b0 >> 2];
+			    resp[n++] = b64[((b0 & 3) << 4) | (b1 >> 4)];
+			    resp[n++] = b64[((b1 & 0x0F) << 2) | (b2 >> 6)];
+			    resp[n++] = b64[b2 & 0x3F];
+			}
+			if (i + 1 == clip_len) {
+			    uint8_t b0 = (uint8_t) t->clip[i];
+			    resp[n++] = b64[b0 >> 2];
+			    resp[n++] = b64[(b0 & 3) << 4];
+			    resp[n++] = '=';
+			    resp[n++] = '=';
+			} else if (i + 2 == clip_len) {
+			    uint8_t b0 = (uint8_t) t->clip[i];
+			    uint8_t b1 = (uint8_t) t->clip[i + 1];
+			    resp[n++] = b64[b0 >> 2];
+			    resp[n++] = b64[((b0 & 3) << 4) | (b1 >> 4)];
+			    resp[n++] = b64[(b1 & 0x0F) << 2];
+			    resp[n++] = '=';
 			}
 			resp[n++] = '\033';
 			resp[n++] = '\\';

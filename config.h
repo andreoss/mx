@@ -61,7 +61,7 @@ static Key key[] attribute_unused = {
 static const char *frontend_default_font attribute_unused =
     "Terminus:size=12:antialias=false";
 static unsigned frontend_cursor_shape attribute_unused = 5;
-static unsigned frontend_cursor_thickness attribute_unused = 4;
+static unsigned frontend_cursor_thickness attribute_unused = 2;
 static int frontend_font_outline attribute_unused = 1;
 static double frontend_font_outline_alpha attribute_unused = 0.35;
 static int frontend_border_blocks attribute_unused = 1;

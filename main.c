@@ -93,6 +93,7 @@ static char *sel_buf;
 static size_t sel_len;
 static xcb_atom_t xcb_sel_prop;
 static xcb_atom_t xcb_sel_targets;
+static xcb_atom_t xcb_clipboard;
 static xcb_timestamp_t xcb_last_time;
 
 
@@ -376,7 +377,7 @@ static void ttyread_handler(void)
 static void send_key(uint32_t ksym, uint modmask)
 {
     if (ksym == XK_Insert && (modmask & 1)) {
-	paste_request(XCB_ATOM_PRIMARY);
+	paste_request(xcb_clipboard ? xcb_clipboard : XCB_ATOM_PRIMARY);
 	return;
     }
     if (term)
@@ -1027,10 +1028,13 @@ int main(int argc, char *argv[])
 	xcb_intern_atom(conn, 0, 8, "TERM_SEL");
     xcb_intern_atom_cookie_t timestamp_cookie =
 	xcb_intern_atom(conn, 0, 9, "TIMESTAMP");
+    xcb_intern_atom_cookie_t clipboard_cookie =
+	xcb_intern_atom(conn, 0, 9, "CLIPBOARD");
 
     xcb_net_wm_name = 0;
     xcb_utf8_string = 0;
     xcb_last_time = XCB_CURRENT_TIME;
+    xcb_clipboard = 0;
     sel_buf = NULL;
     sel_len = 0;
     flags &= ~FLAG_SEL_PENDING;
@@ -1060,6 +1064,11 @@ int main(int argc, char *argv[])
 	r = xcb_intern_atom_reply(conn, timestamp_cookie, NULL);
 	if (r)
 	    free(r);
+	r = xcb_intern_atom_reply(conn, clipboard_cookie, NULL);
+	if (r) {
+	    xcb_clipboard = r->atom;
+	    free(r);
+	}
     }
 
 

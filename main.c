@@ -1299,16 +1299,7 @@ int main(int argc, char *argv[])
 		    double period = 2.0 * cursor_blinktimeout_val;
 		    double phase = fmod(ms, period) / period;
 		    double a = 0.5 * (1.0 + cos(2.0 * M_PI * phase));
-		    double slope = fabs(sin(2.0 * M_PI * phase));
-		    if (slope < 0.05)
-			slope = 0.05;
-		    cursor_tick_delay =
-			(1.0 / 48.0) * period / (M_PI * slope);
-		    if (cursor_tick_delay < CURSOR_FADE_TICK_MS)
-			cursor_tick_delay = CURSOR_FADE_TICK_MS;
-		    if (cursor_tick_delay > 200.0)
-			cursor_tick_delay = 200.0;
-		    if (fabs(a - cursor_alpha_sent) >= 1.0 / 64.0) {
+		    if (fabs(a - cursor_alpha_sent) >= 1.0 / 256.0) {
 			cursor_alpha_sent = a;
 			frontend_set_cursor_alpha(&renderer, a);
 			if (!(flags & FLAG_DRAWING)) {

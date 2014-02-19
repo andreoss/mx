@@ -108,8 +108,7 @@ extern const char *preferred_fonts[4];
 #define BLINK_TIMEOUT_MS 800u
 #define BLINK_FAST_TIMEOUT_MS 200u
 #define CURSOR_BLINK_TIMEOUT_MS 500u
-#define CURSOR_TICK_DELAY_MS 40.0
-#define CURSOR_FADE_TICK_MS 40.0
+#define CURSOR_TICK_DELAY_MS 8.0
 #define FONT_SCALE_INIT 1.0
 #define CTRL_S_TIMEOUT_MS 2000
 #define TABS 8

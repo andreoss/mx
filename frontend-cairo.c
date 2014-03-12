@@ -1512,8 +1512,8 @@ cairo_frame(void *ctx, const Screen *s,
     }
     b->prev_cur_x = cur_px;
     b->prev_cur_y = cur_py;
-    b->prev_cur_w = cur_px >= 0 ? cw + 8 : 0;
-    b->prev_cur_h = cur_px >= 0 ? ch + 8 : 0;
+    b->prev_cur_w = cur_px >= 0 ? cw + 2 * cm : 0;
+    b->prev_cur_h = cur_px >= 0 ? ch + 2 * cm : 0;
 
     if (b->backbuf) {
 	cairo_surface_flush(b->backbuf);

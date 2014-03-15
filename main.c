@@ -621,6 +621,16 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		    pty_write(pty, "\x13", 1);
 		    break;
 		}
+		if (ksym == XK_l) {
+		    flags &= ~FLAG_CTRL_S_PREFIX;
+		    frontend_resize(&renderer,
+				    (int) screen_cols(term_screen(term)),
+				    (int) screen_rows(term_screen(term)));
+		    term_dirty(term);
+		    clock_gettime(CLOCK_MONOTONIC, &draw_trigger);
+		    flags |= FLAG_DRAWING;
+		    break;
+		}
 		flags &= ~FLAG_CTRL_S_PREFIX;
 		send_key((uint32_t) ksym,
 			 kp->state & ~XCB_KEY_BUT_MASK_CONTROL);

@@ -731,8 +731,8 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		    pty_resize(pty, cols, rows);
 		    pty_signal(pty, SIGWINCH);
 		}
-		frontend_resize_window(&renderer, cn->width, cn->height);
 	    }
+	    frontend_resize_window(&renderer, cn->width, cn->height);
 	    break;
 	}
 

@@ -676,6 +676,12 @@ static void cairo_resize(void *ctx, int cols, int rows)
     }
     free(b->repaint);
     b->repaint = malloc((size_t) b->cols * b->rows);
+    if (b->repaint)
+	memset(b->repaint, 0, (size_t) b->cols * b->rows);
+    b->prev_cur_x = 0;
+    b->prev_cur_y = 0;
+    b->prev_cur_w = 0;
+    b->prev_cur_h = 0;
     b->flags |= CAIRO_FORCE_FULL;
 }
 
@@ -971,8 +977,11 @@ cairo_frame(void *ctx, const Screen *s,
 	cm = 1;
     cairo_t *draw = b->backcr ? b->backcr : b->cr;
 
-    if (!b->repaint)
+    if (!b->repaint) {
 	b->repaint = malloc((size_t) cols * rows);
+	if (b->repaint)
+	    memset(b->repaint, 0, (size_t) cols * rows);
+    }
     if (!b->repaint)
 	return;
     int use_diff = b->drawn != NULL;

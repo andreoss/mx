@@ -406,6 +406,8 @@ ColourCorrection colour_regression_ccm(const Palette *p)
 
 Argb colour_correct(const ColourCorrection *cc, Argb c)
 {
+    if ((c & COLOUR_MASK) == COLOUR_MASK && !(cc->flags & CC_INVERTED) && (cc->flags & CC_CCM_ENABLED))
+        return 0xFFFFEA;
     float r = (c >> 16) & COLOUR_CHANNEL_MASK;
     float g = (c >> 8) & COLOUR_CHANNEL_MASK;
     float b = (c >> 0) & COLOUR_CHANNEL_MASK;

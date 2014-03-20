@@ -1895,6 +1895,8 @@ is_valid_box(const Screen *s, const Region *r, int cols, int rows)
 	return 0;
     if (r->x0 == 0 && r->y0 == 0 && r->x1 == cols && r->y1 == rows)
 	return 0;
+    if ((r->x1 - r->x0) * (r->y1 - r->y0) > cols * rows * 3 / 4)
+	return 0;
     if (r->y0 > 0 && !check_edge(s, r, 0, r->y0 - 1, r->x0, r->x1))
 	return 0;
     if (r->y1 < rows && !check_edge(s, r, 0, r->y1, r->x0, r->x1))

@@ -87,7 +87,7 @@ Region *region_compute(const Plane *p, int cols, int rows,
 	    }
 
 	    regions[nregions++] = (Region) {
-	    x, y, x0, y0, bg, has_printable};
+		.bounds = {x, y, x0, y0}, .bg = bg, .flags = has_printable ? REGION_HAS_PRINTABLE : 0};
 	}
     }
 

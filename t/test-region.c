@@ -38,9 +38,9 @@ static void test_region_single(void)
 	region_free(r);
 	return;
     }
-    if (r[0].x0 != 0 || r[0].y0 != 0 || r[0].x1 != 5 || r[0].y1 != 5) {
-	printf("  FAIL  region_single: coords %d,%d,%d,%d\n", r[0].x0,
-	       r[0].y0, r[0].x1, r[0].y1);
+    if (r[0].bounds.x0 != 0 || r[0].bounds.y0 != 0 || r[0].bounds.x1 != 5 || r[0].bounds.y1 != 5) {
+	printf("  FAIL  region_single: coords %d,%d,%d,%d\n", r[0].bounds.x0,
+	       r[0].bounds.y0, r[0].bounds.x1, r[0].bounds.y1);
 	failed++;
     } else {
 	printf("  PASS  region_single\n");

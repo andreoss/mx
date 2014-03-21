@@ -1188,21 +1188,21 @@ cairo_frame(void *ctx, const Screen *s,
     if (fx2 >= 0 && nregions > 0)
 	for (int i = 0; i < nregions; i++) {
 	    Region *r = &regions[i];
-	    if (r->x1 <= fx1 || r->x0 > fx2 || r->y1 <= fy1 || r->y0 > fy2)
+	    if (r->bounds.x1 <= fx1 || r->bounds.x0 > fx2 || r->bounds.y1 <= fy1 || r->bounds.y0 > fy2)
 		continue;
-	    for (int ry = r->y0; ry < r->y1; ry++) {
+	    for (int ry = r->bounds.y0; ry < r->bounds.y1; ry++) {
 		uint8_t *rflags = b->repaint + (size_t) ry * cols;
-		for (int rx = r->x0; rx < r->x1; rx++)
+		for (int rx = r->bounds.x0; rx < r->bounds.x1; rx++)
 		    rflags[rx] = 1;
 	    }
-	    if (r->x0 < fx1)
-		fx1 = r->x0;
-	    if (r->x1 - 1 > fx2)
-		fx2 = r->x1 - 1;
-	    if (r->y0 < fy1)
-		fy1 = r->y0;
-	    if (r->y1 - 1 > fy2)
-		fy2 = r->y1 - 1;
+	    if (r->bounds.x0 < fx1)
+		fx1 = r->bounds.x0;
+	    if (r->bounds.x1 - 1 > fx2)
+		fx2 = r->bounds.x1 - 1;
+	    if (r->bounds.y0 < fy1)
+		fy1 = r->bounds.y0;
+	    if (r->bounds.y1 - 1 > fy2)
+		fy2 = r->bounds.y1 - 1;
 	}
 
     if (fx2 >= 0) {
@@ -1289,9 +1289,9 @@ cairo_frame(void *ctx, const Screen *s,
 		    continue;
 		Argb bg_c;
 		resolve_palette(b, r->bg, &bg_c);
-		draw_region_gradient(draw, bp + r->x0 * cw,
-				     bp + r->y0 * ch, bp + r->x1 * cw,
-				     bp + r->y1 * ch, bg_c);
+		draw_region_gradient(draw, bp + r->bounds.x0 * cw,
+				     bp + r->bounds.y0 * ch, bp + r->bounds.x1 * cw,
+				     bp + r->bounds.y1 * ch, bg_c);
 	    }
 	    cairo_restore(draw);
 	}
@@ -1889,21 +1889,22 @@ check_edge(const Screen *s, const Region *r,
 static int
 is_valid_box(const Screen *s, const Region *r, int cols, int rows)
 {
+    Rect b = r->bounds;
     if (!(r->flags & REGION_HAS_PRINTABLE))
 	return 0;
-    if (r->x1 - r->x0 < 3)
+    if (rect_width(&b) < 3)
 	return 0;
-    if (r->x0 == 0 && r->y0 == 0 && r->x1 == cols && r->y1 == rows)
+    if (b.x0 == 0 && b.y0 == 0 && b.x1 == cols && b.y1 == rows)
 	return 0;
-    if ((r->x1 - r->x0) * (r->y1 - r->y0) > cols * rows * 3 / 4)
+    if (rect_area(&b) > cols * rows * 3 / 4)
 	return 0;
-    if (r->y0 > 0 && !check_edge(s, r, 0, r->y0 - 1, r->x0, r->x1))
+    if (b.y0 > 0 && !check_edge(s, r, 0, b.y0 - 1, b.x0, b.x1))
 	return 0;
-    if (r->y1 < rows && !check_edge(s, r, 0, r->y1, r->x0, r->x1))
+    if (b.y1 < rows && !check_edge(s, r, 0, b.y1, b.x0, b.x1))
 	return 0;
-    if (r->x0 > 0 && !check_edge(s, r, 1, r->x0 - 1, r->y0, r->y1))
+    if (b.x0 > 0 && !check_edge(s, r, 1, b.x0 - 1, b.y0, b.y1))
 	return 0;
-    if (r->x1 < cols && !check_edge(s, r, 1, r->x1, r->y0, r->y1))
+    if (b.x1 < cols && !check_edge(s, r, 1, b.x1, b.y0, b.y1))
 	return 0;
     return 1;
 }
@@ -1960,10 +1961,10 @@ cairo_draw_block_borders(CairoBackend *b, cairo_t *draw, const Screen *s)
 	double rc, gc, bc;
 	argb_to_rgb(border_c, &rc, &gc, &bc);
 
-	int xa = bp + r->x0 * cw;
-	int ya = bp + r->y0 * ch;
-	int xb = bp + r->x1 * cw;
-	int yb = bp + r->y1 * ch;
+	int xa = bp + r->bounds.x0 * cw;
+	int ya = bp + r->bounds.y0 * ch;
+	int xb = bp + r->bounds.x1 * cw;
+	int yb = bp + r->bounds.y1 * ch;
 
 	glow_edge_h(draw, xa, xb, ya, -1, rc, gc, bc);
 	glow_edge_h(draw, xa, xb, yb, 1, rc, gc, bc);

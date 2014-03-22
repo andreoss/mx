@@ -204,15 +204,29 @@ static Selection selection;
 void term_sel_start(Term *t, int x, int y, SelectionSnap snap)
 {
     selection.flags |= SELECTION_ACTIVE;
-    selection.origin_x = selection.start_x = x;
-    selection.origin_y = selection.start_y = y;
+    selection.origin_x = x;
+    selection.origin_y = y;
+    selection.start_x = x;
+    selection.start_y = y;
+    selection.end_x = x;
+    selection.end_y = y;
     if (snap == SNAP_WORD) {
-	while (selection.start_x > 0) {
-	    Cell c = screen_get(t->screen, selection.start_x - 1,
-				selection.start_y);
-	    if (!is_word_char(c.r))
-		break;
-	    selection.start_x--;
+	Cell cur = screen_get(t->screen, x, y);
+	if (is_word_char(cur.r)) {
+	    while (selection.start_x > 0) {
+		Cell c = screen_get(t->screen, selection.start_x - 1,
+				    selection.start_y);
+		if (!is_word_char(c.r))
+		    break;
+		selection.start_x--;
+	    }
+	    while (selection.end_x < (int)screen_cols(t->screen) - 1) {
+		Cell c = screen_get(t->screen, selection.end_x + 1,
+				    selection.start_y);
+		if (!is_word_char(c.r))
+		    break;
+		selection.end_x++;
+	    }
 	}
     }
 }
@@ -221,13 +235,17 @@ void term_sel_extend(Term *t, int x, int y)
 {
     if (!(selection.flags & SELECTION_ACTIVE))
 	return;
-    selection.end_x = x;
-    selection.end_y = y;
-
-    selection.start_x = MIN(selection.origin_x, selection.end_x);
-    selection.start_y = MIN(selection.origin_y, selection.end_y);
-    selection.end_x = MAX(selection.origin_x, selection.end_x);
-    selection.end_y = MAX(selection.origin_y, selection.end_y);
+    if (y < selection.origin_y || (y == selection.origin_y && x < selection.origin_x)) {
+	selection.start_x = x;
+	selection.start_y = y;
+	selection.end_x = selection.origin_x;
+	selection.end_y = selection.origin_y;
+    } else {
+	selection.start_x = selection.origin_x;
+	selection.start_y = selection.origin_y;
+	selection.end_x = x;
+	selection.end_y = y;
+    }
 }
 
 void term_sel_clear(Term *t)

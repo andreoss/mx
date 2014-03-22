@@ -57,6 +57,7 @@ int cursor_shape_blinks(int shape);
 
 
 typedef enum {
+    SNAP_NONE,
     SNAP_WORD,
 } SelectionSnap;
 

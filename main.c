@@ -468,7 +468,7 @@ static void input_free(Input *t)
 static void input_sel_start(Term *term, int col, int row)
 {
     term_sel_clear(term);
-    term_sel_start(term, col, row, SNAP_WORD);
+    term_sel_start(term, col, row, SNAP_NONE);
 }
 
 static void input_sel_extend(Term *term, int col, int row)

@@ -31,6 +31,20 @@ static void argb_to_rgb(Argb c, double *r, double *g, double *b)
     *b = (double) (c & COLOUR_CHANNEL_MASK) / COLOUR_CHANNEL_MAX;
 }
 
+static Argb apply_sepia(Argb c)
+{
+    double r = (c >> 16) & COLOUR_CHANNEL_MASK;
+    double g = (c >> 8) & COLOUR_CHANNEL_MASK;
+    double b = c & COLOUR_CHANNEL_MASK;
+    double nr = r * 0.393 + g * 0.769 + b * 0.189;
+    double ng = r * 0.349 + g * 0.686 + b * 0.168;
+    double nb = r * 0.272 + g * 0.534 + b * 0.131;
+    if (nr > 255) nr = 255;
+    if (ng > 255) ng = 255;
+    if (nb > 255) nb = 255;
+    return ((Argb)(nr + 0.5) << 16) | ((Argb)(ng + 0.5) << 8) | (Argb)(nb + 0.5);
+}
+
 static int attr_faint(Attr a)
 {
     return (a & ATTR_BOLD_FAINT) == ATTR_FAINT;
@@ -1223,12 +1237,6 @@ cairo_frame(void *ctx, const Screen *s,
 		Cell c = drow[x];
 		int eff_fg, eff_bg;
 		cell_effective(c, &eff_fg, &eff_bg);
-		if (sel_check(x, y, sel_active, sel_start_x,
-			      sel_start_y, sel_end_x, sel_end_y)) {
-		    int tmp = eff_fg;
-		    eff_fg = eff_bg;
-		    eff_bg = tmp;
-		}
 		int span = 1;
 		while (x + span < cols && flags[x + span]) {
 		    Cell n = drow[x + span];
@@ -1362,11 +1370,6 @@ cairo_frame(void *ctx, const Screen *s,
 
 		    int eff_fg, eff_bg;
 		    cell_effective(first, &eff_fg, &eff_bg);
-		    if (span_sel) {
-			int tmp = eff_fg;
-			eff_fg = eff_bg;
-			eff_bg = tmp;
-		    }
 		    int bold_idx = eff_fg;
 		    if ((first.attr & ATTR_BOLD) && bold_idx >= 0
 			&& bold_idx < 8)
@@ -1380,6 +1383,8 @@ cairo_frame(void *ctx, const Screen *s,
 			fg = colour_min_contrast(fg, clamp_bg,
 						 MIN_CONTRAST);
 		    }
+		    if (span_sel)
+			fg = apply_sepia(fg);
 
 		    if ((mode & MODE_BLINK)
 			&& (first.attr &
@@ -1564,7 +1569,10 @@ cairo_frame(void *ctx, const Screen *s,
 	int sel_miny = MAX(0, sel_start_y);
 	int sel_maxy = MIN(rows - 1, sel_end_y);
 	double obp = bp;
-	cairo_set_source_rgba(b->cr, 1, 0, 0, 0.5);
+	Argb sel_red = colour_correct(&b->colour_cc, 0xFF0000);
+	double sel_r, sel_g, sel_b;
+	argb_to_rgb(sel_red, &sel_r, &sel_g, &sel_b);
+	cairo_set_source_rgba(b->cr, sel_r, sel_g, sel_b, 0.5);
 	cairo_set_line_width(b->cr, 1.5 * lw);
 	cairo_new_path(b->cr);
 

@@ -1257,6 +1257,22 @@ cairo_frame(void *ctx, const Screen *s,
 		}
 		Argb cell_bg;
 		resolve_palette(b, eff_bg, &cell_bg);
+		if (sel_check(x, y, sel_active, sel_start_x, sel_start_y, sel_end_x, sel_end_y)) {
+		    float l = colour_luma(cell_bg);
+		    int r = (cell_bg >> 16) & 0xFF;
+		    int g = (cell_bg >> 8) & 0xFF;
+		    int bv = cell_bg & 0xFF;
+		    if (l < 0.5f) {
+			r = r + (int)((255 - r) * 0.2f);
+			g = g + (int)((255 - g) * 0.2f);
+			bv = bv + (int)((255 - bv) * 0.2f);
+		    } else {
+			r = (int)(r * 0.8f);
+			g = (int)(g * 0.8f);
+			bv = (int)(bv * 0.8f);
+		    }
+		    cell_bg = ((Argb)r << 16) | ((Argb)g << 8) | (Argb)bv;
+		}
 		set_source_argb(draw, cell_bg);
 		cairo_rectangle(draw, bp + x * cw, bp + y * ch,
 				cw * span, ch);

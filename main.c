@@ -469,6 +469,9 @@ static void input_sel_start(Term *term, int col, int row)
 {
     term_sel_clear(term);
     term_sel_start(term, col, row, SNAP_NONE);
+    term_dirty(term);
+    clock_gettime(CLOCK_MONOTONIC, &draw_trigger);
+    flags |= FLAG_DRAWING;
 }
 
 static void input_sel_extend(Term *term, int col, int row)
@@ -476,6 +479,9 @@ static void input_sel_extend(Term *term, int col, int row)
     if (!term_sel_active(term))
 	return;
     term_sel_extend(term, col, row);
+    term_dirty(term);
+    clock_gettime(CLOCK_MONOTONIC, &draw_trigger);
+    flags |= FLAG_DRAWING;
 }
 
 static int input_sel_active(const Input *t)
@@ -1342,7 +1348,7 @@ int main(int argc, char *argv[])
 	clock_gettime(CLOCK_MONOTONIC, &pt1);
 
 	double elapsed = TIMEDIFF_MS(pt1, draw_trigger);
-	if (elapsed < minlatency_val) {
+	if (elapsed < minlatency_val && !term_sel_active(term)) {
 	    int remain = (int) (minlatency_val - elapsed);
 	    if (remain > 0)
 		usleep((useconds_t) remain * 1000);
@@ -1351,7 +1357,7 @@ int main(int argc, char *argv[])
 
 	if (last_frame_time.tv_sec) {
 	    double since_frame = TIMEDIFF_MS(pt1, last_frame_time);
-	    if (since_frame < FRAME_TIME_MS)
+	    if (since_frame < FRAME_TIME_MS && !term_sel_active(term))
 		continue;
 	}
 

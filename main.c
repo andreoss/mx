@@ -69,6 +69,7 @@ static FrontendProto renderer;
 static FrontendProto frontend_proto;
 static int mod_switch_mask;
 static Palette *palette;
+static ColourCorrection current_cc;
 static Pty *pty;
 static Input *input;
 
@@ -259,11 +260,26 @@ static void title_cb(const char *title, void *user)
 
 
 
+static void update_back_pixel(void)
+{
+    static uint32_t last = 0xFFFFFFFF;
+    if (!conn || !xcb_win || !palette)
+	return;
+    Argb bg = palette_resolve_corrected(palette, PAL_DEFAULT_BG,
+					&current_cc);
+    uint32_t px = bg & 0x00FFFFFF;
+    if (px == last)
+	return;
+    last = px;
+    xcb_change_window_attributes(conn, xcb_win, XCB_CW_BACK_PIXEL, &px);
+}
+
 static void palette_random_generate(void)
 {
     palette_randomise(palette);
-    ColourCorrection cc = colour_regression_ccm(palette);
-    frontend_set_colour_correction(&renderer, &cc);
+    current_cc = colour_regression_ccm(palette);
+    frontend_set_colour_correction(&renderer, &current_cc);
+    update_back_pixel();
     term_dirty(term);
     flags |= FLAG_DRAWING;
 }
@@ -271,8 +287,9 @@ static void palette_random_generate(void)
 static void palette_flip_dark_light(void)
 {
     palette_flip_fg_bg(palette);
-    ColourCorrection cc = colour_regression_ccm(palette);
-    frontend_set_colour_correction(&renderer, &cc);
+    current_cc = colour_regression_ccm(palette);
+    frontend_set_colour_correction(&renderer, &current_cc);
+    update_back_pixel();
     term_dirty(term);
     flags |= FLAG_DRAWING;
 }
@@ -991,6 +1008,7 @@ int main(int argc, char *argv[])
     int dpi = xcb_dpi(xcb_screen);
 
 
+    current_cc = COLOUR_CORRECTION_DEFAULT;
     palette = palette_new();
     palette_load_fgbg(palette, frontend_default_fg, frontend_default_bg,
 		      frontend_default_colourname, PAL_SIZE);
@@ -1016,10 +1034,13 @@ int main(int argc, char *argv[])
 	2 * frontend_border(&renderer) +
 	init_rows * frontend_char_height(&renderer);
 
-    uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
-    uint32_t values[2];
-    values[0] = xcb_screen->black_pixel;
-    values[1] = XCB_EVENT_MASK_EXPOSURE |
+    uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_BIT_GRAVITY |
+	XCB_CW_EVENT_MASK;
+    uint32_t values[3];
+    values[0] = palette_resolve_corrected(palette, PAL_DEFAULT_BG,
+					  &current_cc) & 0x00FFFFFF;
+    values[1] = XCB_GRAVITY_NORTH_WEST;
+    values[2] = XCB_EVENT_MASK_EXPOSURE |
 	XCB_EVENT_MASK_KEY_PRESS |
 	XCB_EVENT_MASK_KEY_RELEASE |
 	XCB_EVENT_MASK_BUTTON_PRESS |
@@ -1152,8 +1173,9 @@ int main(int argc, char *argv[])
 					frontend_default_font, palette,
 					dpi);
     renderer = frontend_proto;
-    ColourCorrection cc2 = colour_regression_ccm(palette);
-    frontend_set_colour_correction(&renderer, &cc2);
+    current_cc = colour_regression_ccm(palette);
+    frontend_set_colour_correction(&renderer, &current_cc);
+    update_back_pixel();
     frontend_resize(&renderer, init_cols, init_rows);
 
     if (term_override)
@@ -1378,6 +1400,7 @@ int main(int argc, char *argv[])
 			   sel_start_y, sel_end_x, sel_end_y);
 	}
 
+	update_back_pixel();
 	frontend_flush(&renderer);
 	xcb_flush(conn);
 	clock_gettime(CLOCK_MONOTONIC, &last_frame_time);

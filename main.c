@@ -377,7 +377,7 @@ static void ttyread_handler(void)
 static void send_key(uint32_t ksym, uint modmask)
 {
     if (ksym == XK_Insert && (modmask & 1)) {
-	paste_request(xcb_clipboard ? xcb_clipboard : XCB_ATOM_PRIMARY);
+	paste_request(XCB_ATOM_PRIMARY);
 	return;
     }
     if (term)
@@ -586,6 +586,9 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		col |= 2;
 	    xcb_keysym_t ksym =
 		xcb_key_symbols_get_keysym(keysyms, kp->detail, col);
+	    if (ksym == XCB_NO_SYMBOL)
+		ksym = xcb_key_symbols_get_keysym(keysyms, kp->detail,
+						  col & ~1);
 	    xcb_keysym_t base_ksym = ksym;
 	    if (xcb_key_symbols_get_keysym(keysyms, kp->detail, 0) ==
 		XK_space)
@@ -779,9 +782,11 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 	{
 	    xcb_selection_notify_event_t *sn =
 		(xcb_selection_notify_event_t *) ge;
-	    if (!(flags & FLAG_SEL_PENDING) || sn->property == XCB_ATOM_NONE)
+	    if (!(flags & FLAG_SEL_PENDING))
 		break;
 	    flags &= ~FLAG_SEL_PENDING;
+	    if (sn->property == XCB_ATOM_NONE)
+		break;
 	    xcb_get_property_cookie_t gc =
 		xcb_get_property(conn, 0, xcb_win, sn->property,
 				 XCB_ATOM_ANY, 0, 0x100000);

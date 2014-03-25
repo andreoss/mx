@@ -598,14 +598,18 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 						       col & 3);
 
 	    if (flags & FLAG_CTRL_S_PREFIX) {
-		clock_gettime(CLOCK_MONOTONIC, &ctrl_s_time);
+		if ((ksym >= XK_Shift_L && ksym <= XK_Hyper_R)
+		    || ksym == XK_Mode_switch
+		    || ksym == XK_ISO_Level3_Shift
+		    || ksym == XK_ISO_Level5_Shift)
+		    break;
+		flags &= ~FLAG_CTRL_S_PREFIX;
+		memset(&ctrl_s_time, 0, sizeof(ctrl_s_time));
 		if (ksym == '+' || ksym == '=') {
-		    flags &= ~FLAG_CTRL_S_PREFIX;
 		    zoom(0.1);
 		    break;
 		}
 		if (ksym == '-') {
-		    flags &= ~FLAG_CTRL_S_PREFIX;
 		    zoom(-0.1);
 		    break;
 		}
@@ -615,23 +619,20 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 				   XCB_KEY_BUT_MASK_MOD_4 |
 				   XCB_KEY_BUT_MASK_MOD_5))) {
 		    if (ksym == XK_c) {
-			flags &= ~FLAG_CTRL_S_PREFIX;
 			palette_random_generate();
 			break;
 		    }
 		    if (ksym == XK_i) {
-			flags &= ~FLAG_CTRL_S_PREFIX;
 			palette_flip_dark_light();
 			break;
 		    }
 		}
 		if (ksym == 0x0073) {
-		    flags &= ~FLAG_CTRL_S_PREFIX;
+		    clock_gettime(CLOCK_MONOTONIC, &ctrl_s_time);
 		    pty_write(pty, "\x13", 1);
 		    break;
 		}
 		if (ksym == XK_l) {
-		    flags &= ~FLAG_CTRL_S_PREFIX;
 		    frontend_resize(&renderer,
 				    (int) screen_cols(term_screen(term)),
 				    (int) screen_rows(term_screen(term)));
@@ -640,7 +641,6 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		    flags |= FLAG_DRAWING;
 		    break;
 		}
-		flags &= ~FLAG_CTRL_S_PREFIX;
 		send_key((uint32_t) ksym,
 			 kp->state & ~XCB_KEY_BUT_MASK_CONTROL);
 		break;

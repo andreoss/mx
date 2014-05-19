@@ -107,6 +107,7 @@ enum {
     FLAG_CTRL_S_PREFIX = 1 << 5,
     FLAG_BLINK_HAS_SLOW = 1 << 6,
     FLAG_WIN_FOCUSED = 1 << 7,
+    FLAG_CONF_PENDING = 1 << 8,
 };
 static unsigned flags = FLAG_ON_RESIZE_RESIZE | FLAG_WIN_FOCUSED;
 
@@ -582,6 +583,36 @@ static void input_mouse(Input *t, int button, unsigned int modmask,
     pty_write(pty, buf, len);
 }
 
+static int pending_conf_w;
+static int pending_conf_h;
+
+static void apply_configure(void)
+{
+    if (!(flags & FLAG_CONF_PENDING))
+	return;
+    flags &= ~FLAG_CONF_PENDING;
+    int w = pending_conf_w;
+    int h = pending_conf_h;
+    if (w == frontend_actual_width(&renderer)
+	&& h == frontend_actual_height(&renderer))
+	return;
+    int cols =
+	(w - 2 * frontend_border(&renderer)) /
+	frontend_char_width(&renderer);
+    int rows =
+	(h - 2 * frontend_border(&renderer)) /
+	frontend_char_height(&renderer);
+    if (cols > 0 && rows > 0 && (flags & FLAG_ON_RESIZE_RESIZE)
+	&& (cols != (int) screen_cols(term_screen(term))
+	    || rows != (int) screen_rows(term_screen(term)))) {
+	term_resize(term, cols, rows);
+	frontend_resize(&renderer, cols, rows);
+	pty_resize(pty, cols, rows);
+	pty_signal(pty, SIGWINCH);
+    }
+    frontend_resize_window(&renderer, w, h);
+}
+
 static void handle_xcb_event(xcb_generic_event_t *ge)
 {
     uint8_t type = ge->response_type & ~0x80;
@@ -739,26 +770,9 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 	{
 	    xcb_configure_notify_event_t *cn =
 		(xcb_configure_notify_event_t *) ge;
-	    if ((int) cn->width == frontend_actual_width(&renderer)
-		&& (int) cn->height == frontend_actual_height(&renderer))
-		break;
-	    int cols =
-		(cn->width -
-		 2 * frontend_border(&renderer)) /
-		frontend_char_width(&renderer);
-	    int rows =
-		(cn->height -
-		 2 * frontend_border(&renderer)) /
-		frontend_char_height(&renderer);
-	    if (cols > 0 && rows > 0) {
-		if (flags & FLAG_ON_RESIZE_RESIZE) {
-		    term_resize(term, cols, rows);
-		    frontend_resize(&renderer, cols, rows);
-		    pty_resize(pty, cols, rows);
-		    pty_signal(pty, SIGWINCH);
-		}
-	    }
-	    frontend_resize_window(&renderer, cn->width, cn->height);
+	    pending_conf_w = cn->width;
+	    pending_conf_h = cn->height;
+	    flags |= FLAG_CONF_PENDING;
 	    break;
 	}
 
@@ -1228,6 +1242,7 @@ int main(int argc, char *argv[])
 		flags |= FLAG_DRAWING;
 	    }
 	}
+	apply_configure();
 
 	if (flags & FLAG_DRAWING) {
 	    double elapsed = TIMEDIFF_MS(now, draw_trigger);
@@ -1317,6 +1332,7 @@ int main(int argc, char *argv[])
 		flags |= FLAG_DRAWING;
 	    }
 	}
+	apply_configure();
 
 	if (blinktimeout_val || blinktimeout_fast_val) {
 	    if (flags & FLAG_BLINK_HAS_SLOW) {

@@ -16,6 +16,9 @@ struct Pty {
     int master;
     int slave;
     pid_t child;
+    char *wbuf;
+    size_t wlen;
+    size_t wcap;
 };
 
 static const char *term_type = TERM_TYPE;
@@ -145,6 +148,7 @@ void pty_free(Pty *p)
 	    usleep(20000);
 	}
     }
+    free(p->wbuf);
     free(p);
 }
 
@@ -181,16 +185,68 @@ int pty_read(Pty *p, char *buf, size_t cap)
     return (int) n;
 }
 
+static int pty_queue(Pty *p, const char *buf, size_t len)
+{
+    if (p->wlen + len > p->wcap) {
+	size_t cap = p->wcap ? p->wcap : 1024;
+	while (cap < p->wlen + len)
+	    cap *= 2;
+	char *nb = realloc(p->wbuf, cap);
+	if (!nb)
+	    return -1;
+	p->wbuf = nb;
+	p->wcap = cap;
+    }
+    memcpy(p->wbuf + p->wlen, buf, len);
+    p->wlen += len;
+    return 0;
+}
+
+int pty_pending(const Pty *p)
+{
+    return p->wlen > 0;
+}
+
+void pty_flush(Pty *p)
+{
+    if (p->master < 0) {
+	p->wlen = 0;
+	return;
+    }
+    size_t off = 0;
+    while (off < p->wlen) {
+	ssize_t n = write(p->master, p->wbuf + off,
+			  MIN(p->wlen - off, 255));
+	if (n < 0) {
+	    if (errno == EINTR)
+		continue;
+	    break;
+	}
+	off += n;
+    }
+    if (off > 0) {
+	memmove(p->wbuf, p->wbuf + off, p->wlen - off);
+	p->wlen -= off;
+    }
+}
+
 void pty_write(Pty *p, const char *buf, size_t len)
 {
     if (p->master < 0)
 	return;
 
+    if (p->wlen > 0) {
+	pty_queue(p, buf, len);
+	pty_flush(p);
+	return;
+    }
     while (len > 0) {
 	ssize_t n = write(p->master, buf, MIN(len, 255));
 	if (n < 0) {
-	    if (errno == EAGAIN)
-		break;
+	    if (errno == EAGAIN) {
+		pty_queue(p, buf, len);
+		return;
+	    }
 	    if (errno == EINTR)
 		continue;
 	    break;

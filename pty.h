@@ -31,6 +31,12 @@ int pty_read(Pty * p, char *buf, size_t cap);
 void pty_write(Pty * p, const char *buf, size_t len);
 
 
+int pty_pending(const Pty * p);
+
+
+void pty_flush(Pty * p);
+
+
 void pty_resize(Pty * p, int cols, int rows);
 
 

@@ -1221,6 +1221,8 @@ int main(int argc, char *argv[])
 	if (!(flags & FLAG_CHILD_EXITED)) {
 	    fds[0].fd = ptyfd;
 	    fds[0].events = POLLIN;
+	    if (pty_pending(pty))
+		fds[0].events |= POLLOUT;
 	} else {
 	    fds[0].fd = -1;
 	}
@@ -1311,6 +1313,9 @@ int main(int argc, char *argv[])
 	    last_proccheck = now;
 	    refresh_proc_prefix();
 	}
+
+	if (!(flags & FLAG_CHILD_EXITED) && fds[0].revents & POLLOUT)
+	    pty_flush(pty);
 
 	if (!(flags & FLAG_CHILD_EXITED) && fds[0].revents & (POLLIN | POLLHUP)) {
 	    ttyread_handler();

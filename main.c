@@ -508,6 +508,11 @@ static int input_sel_active(const Input *t)
     return term_sel_active(NULL);
 }
 
+static int input_sel_dragging(const Input *t)
+{
+    return t->buttons & 1;
+}
+
 static void input_mouse(Input *t, int button, unsigned int modmask,
 			int col, int row, MouseAction type, void *pty,
 			Term *term)
@@ -1396,7 +1401,7 @@ int main(int argc, char *argv[])
 	clock_gettime(CLOCK_MONOTONIC, &pt1);
 
 	double elapsed = TIMEDIFF_MS(pt1, draw_trigger);
-	if (elapsed < minlatency_val && !term_sel_active(term)) {
+	if (elapsed < minlatency_val && !input_sel_dragging(input)) {
 	    int remain = (int) (minlatency_val - elapsed);
 	    if (remain > 0)
 		usleep((useconds_t) remain * 1000);
@@ -1405,7 +1410,7 @@ int main(int argc, char *argv[])
 
 	if (last_frame_time.tv_sec) {
 	    double since_frame = TIMEDIFF_MS(pt1, last_frame_time);
-	    if (since_frame < FRAME_TIME_MS && !term_sel_active(term))
+	    if (since_frame < FRAME_TIME_MS && !input_sel_dragging(input))
 		continue;
 	}
 

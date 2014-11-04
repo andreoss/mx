@@ -33,8 +33,10 @@ static int wcwidth_safe(wchar_t u)
     if ((u >= WC_GLYPH_MIN && u <= WC_GLYPH_MAX) ||
 	(u >= WC_GLYPH2_MIN && u <= WC_GLYPH2_MAX))
 	return 1;
-    if (u >= WC_CJK_MIN)
-	return wcwidth(u);
+    if (u >= WC_CJK_MIN) {
+	int w = wcwidth(u);
+	return w < 0 ? 1 : w;
+    }
     {
 	int w = wcwidth(u);
 	if (w == 2) {
@@ -461,6 +463,9 @@ static void term_putc(Term *t, Rune u)
 {
     int width = wcwidth_safe((wchar_t) u);
     int cols = screen_cols(t->screen);
+
+    if (width < 1)
+	width = 1;
 
     if ((t->mode & MODE_WRAP)
 	&& (t->cursor_state & (CURSOR_WRAPNEXT | CURSOR_INPUT_NEEDS_WRAP))) {

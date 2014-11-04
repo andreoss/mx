@@ -277,8 +277,12 @@ void screen_delete_char(Screen *s, int x, int y, size_t n)
     memmove(&buf[x], &buf[x + n], (s->cols - x - n) * sizeof(Cell));
     for (int j = (int) (s->cols - n); j < (int) s->cols; j++)
 	buf[j] = s->filler;
-    if (x < (int) s->used[y])
-	s->used[y] = MAX(x, s->used[y] - n);
+    if (x < (int) s->used[y]) {
+	size_t dec = n < s->used[y] ? s->used[y] - n : 0;
+	if (dec < (size_t) x)
+	    dec = (size_t) x;
+	s->used[y] = dec;
+    }
     screen_dirty(s, x, y, s->cols - 1, y);
 }
 

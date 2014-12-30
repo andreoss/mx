@@ -1,5 +1,11 @@
 mx - a minimal X11 terminal emulator.
 
-Build:  make
-Run:    ./bin/mx
-Test:   make test
+Linux:
+  deps: cairo fontconfig libxcb xcb-util-keysyms libxkbcommon harfbuzz freetype pkg-config
+  make && ./bin/mx
+
+OpenBSD:
+  pkg_add cairo fontconfig libxcb xcb-util-keysyms libxkbcommon harfbuzz
+  gmake && ./bin/mx
+
+Test: make test   (gmake test on OpenBSD; needs a UTF-8 locale, e.g. LC_CTYPE=en_US.UTF-8)

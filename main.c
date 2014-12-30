@@ -392,7 +392,7 @@ static void ttyread_handler(void)
 
 
 
-static void send_key(uint32_t ksym, uint modmask)
+static void send_key(uint32_t ksym, unsigned modmask)
 {
     if (ksym == XK_Insert && (modmask & 1)) {
 	paste_request(XCB_ATOM_PRIMARY);
@@ -721,7 +721,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 	{
 	    xcb_button_press_event_t *bp = (xcb_button_press_event_t *) ge;
 	    xcb_last_time = bp->time;
-	    uint mod = bp->state;
+	    unsigned mod = bp->state;
 	    int col, row;
 	    event_coords(bp->event_x, bp->event_y, &col, &row);
 	    if (col >= 0 && row >= 0) {
@@ -740,7 +740,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 	    xcb_button_release_event_t *br =
 		(xcb_button_release_event_t *) ge;
 	    xcb_last_time = br->time;
-	    uint mod = br->state;
+	    unsigned mod = br->state;
 	    int col, row;
 	    event_coords(br->event_x, br->event_y, &col, &row);
 	    if (col >= 0 && row >= 0) {
@@ -762,7 +762,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 	{
 	    xcb_motion_notify_event_t *mn =
 		(xcb_motion_notify_event_t *) ge;
-	    uint mod = mn->state;
+	    unsigned mod = mn->state;
 	    int col, row;
 	    event_coords(mn->event_x, mn->event_y, &col, &row);
 	    if (col >= 0 && row >= 0)

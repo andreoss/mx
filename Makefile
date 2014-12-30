@@ -19,6 +19,8 @@ $(BINDIR)/mx: $(OBJS) libccor/libccor.a
 	mkdir -p $(BINDIR)
 	$(CC) -o $@ $(OBJS) libccor/libccor.a $(LDFLAGS)
 
+.SUFFIXES: .c .o
+
 .c.o:
 	$(CC) $(CFLAGS) -c -o $@ $<
 

@@ -6,6 +6,6 @@ Linux:
 
 OpenBSD:
   pkg_add cairo fontconfig libxcb xcb-util-keysyms libxkbcommon harfbuzz
-  gmake && ./bin/mx
+  make && ./bin/mx
 
-Test: make test   (gmake test on OpenBSD; needs a UTF-8 locale, e.g. LC_CTYPE=en_US.UTF-8)
+Test: make test   (needs a UTF-8 locale, e.g. LC_CTYPE=en_US.UTF-8)

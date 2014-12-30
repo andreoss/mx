@@ -3,18 +3,20 @@ CFLAGS = -std=c99 -O2 -Wall -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600
 AR = ar
 ARFLAGS = rcs
 
-SRCS = ccor.c
-OBJS = $(SRCS:.c=.o)
+OBJS = ccor.o
 TARGET = libccor.a
 TEST_BIN = ccor-test
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(AR) $(ARFLAGS) $@ $^
+	$(AR) $(ARFLAGS) $@ $(OBJS)
 
-%.o: %.c ccor.h
+.SUFFIXES: .c .o
+.c.o:
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+ccor.o: ccor.c ccor.h
 
 $(TEST_BIN): $(TEST_BIN).c $(TARGET)
 	$(CC) $(CFLAGS) -o $@ $(TEST_BIN).c $(TARGET) -lm

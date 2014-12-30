@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include "ccor.h"
 
 #define BETWEEN(x, a, b) ((a) <= (x) && (x) <= (b))

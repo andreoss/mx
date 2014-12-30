@@ -26,7 +26,7 @@ $(TEST_DIR)/mx-test: $(TOBJS) $(TEST_DIR)/mx-test.c libccor/libccor.a
 	$(CC) $(CFLAGS) -I. -o $@ $(TEST_DIR)/mx-test.c $(TOBJS) libccor/libccor.a $(LDFLAGS) -lm
 
 $(TEST_DIR)/test-region: $(TEST_DIR)/test-region.c region.o screen.o
-	$(CC) -std=c99 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -I. -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -o $@ $(TEST_DIR)/test-region.c region.o screen.o $(LDFLAGS) -lm
+	$(CC) -std=c99 $(FEATURE) -I. -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -o $@ $(TEST_DIR)/test-region.c region.o screen.o $(LDFLAGS) -lm
 
 test: test-mock test-region test-colour-correct
 

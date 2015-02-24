@@ -8,8 +8,10 @@
 #include <cairo.h>
 #include <cairo-ft.h>
 #include <cairo-xcb.h>
+#ifdef USE_PANGO
 #include <hb.h>
 #include <hb-ft.h>
+#endif
 #include "config.h"
 #include "frontend.h"
 #include "region.h"
@@ -50,12 +52,14 @@ static int attr_faint(Attr a)
     return (a & ATTR_BOLD_FAINT) == ATTR_FAINT;
 }
 
+#ifdef USE_PANGO
 static const hb_feature_t default_hb_features[] = {
     { HB_TAG('c', 'a', 'l', 't'), 1, HB_FEATURE_GLOBAL_START,
      HB_FEATURE_GLOBAL_END },
     { HB_TAG('l', 'i', 'g', 'a'), 1, HB_FEATURE_GLOBAL_START,
      HB_FEATURE_GLOBAL_END }
 };
+#endif
 
 static void
 draw_region_gradient(cairo_t *draw, int xa, int ya, int xb, int yb,
@@ -77,24 +81,27 @@ draw_region_gradient(cairo_t *draw, int xa, int ya, int xb, int yb,
     cairo_pattern_destroy(grad);
 }
 
+#ifdef USE_PANGO
 #define DEFAULT_HB_FEATURES_COUNT \
     (sizeof(default_hb_features) / sizeof(default_hb_features[0]))
+#endif
 
 typedef struct {
     FT_Face face;
-    hb_font_t *hb_font;
     cairo_font_face_t *cairo_face;
     int pixel_size;
-    hb_buffer_t *hb_buf;
     cairo_glyph_t *glyph_buf;
     int glyph_cap;
-
+#ifdef USE_PANGO
+    hb_font_t *hb_font;
+    hb_buffer_t *hb_buf;
     char *cache_text;
     int cache_text_len;
     int cache_text_cap;
     uint32_t cache_hash;
     unsigned int cache_glyph_count;
     hb_glyph_info_t *cache_glyph_infos;
+#endif
 } FontResources;
 
 
@@ -311,6 +318,7 @@ font_resources_init(FT_Library lib, const char *font_string, int bold,
 	return res;
     }
 
+#ifdef USE_PANGO
     hb_font_t *hb_font = hb_ft_font_create_referenced(face);
     if (!hb_font) {
 	cairo_font_face_destroy(cairo_face);
@@ -320,11 +328,14 @@ font_resources_init(FT_Library lib, const char *font_string, int bold,
     }
 
     hb_font_set_scale(hb_font, pt_size * HB_FIXED_SCALE, pt_size * HB_FIXED_SCALE);
+    res.hb_font = hb_font;
+    res.hb_buf = hb_buffer_create();
+#else
+    (void) pt_size;
+#endif
 
     res.face = face;
-    res.hb_font = hb_font;
     res.cairo_face = cairo_face;
-    res.hb_buf = hb_buffer_create();
     res.glyph_cap = 256;
     res.glyph_buf = malloc(res.glyph_cap * sizeof(cairo_glyph_t));
 
@@ -336,24 +347,26 @@ static void font_resources_destroy(FontResources *res)
 {
     if (!res)
 	return;
+#ifdef USE_PANGO
     if (res->hb_font)
 	hb_font_destroy(res->hb_font);
+    if (res->hb_buf)
+	hb_buffer_destroy(res->hb_buf);
+    free(res->cache_text);
+    free(res->cache_glyph_infos);
+    res->hb_font = NULL;
+    res->hb_buf = NULL;
+    res->cache_text = NULL;
+    res->cache_glyph_infos = NULL;
+#endif
     if (res->cairo_face)
 	cairo_font_face_destroy(res->cairo_face);
     if (res->face)
 	FT_Done_Face(res->face);
-    if (res->hb_buf)
-	hb_buffer_destroy(res->hb_buf);
     free(res->glyph_buf);
-    free(res->cache_text);
-    free(res->cache_glyph_infos);
     res->face = NULL;
-    res->hb_font = NULL;
     res->cairo_face = NULL;
-    res->hb_buf = NULL;
     res->glyph_buf = NULL;
-    res->cache_text = NULL;
-    res->cache_glyph_infos = NULL;
 }
 
 static double parse_font_size(const char *font_string, double default_size)
@@ -453,10 +466,12 @@ static CairoBackend *backend_new(cairo_surface_t *sfc,
 
     if (b->normal.pixel_size > 0) {
 	b->font_size = (double) b->normal.pixel_size;
+#ifdef USE_PANGO
 	hb_font_set_scale(b->normal.hb_font, b->font_size * HB_FIXED_SCALE,
 			  b->font_size * HB_FIXED_SCALE);
 	hb_font_set_scale(b->bold.hb_font, b->font_size * HB_FIXED_SCALE,
 			  b->font_size * HB_FIXED_SCALE);
+#endif
     }
 
     cairo_save(b->cr);
@@ -840,10 +855,17 @@ draw_hb_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	     int bold, Argb bg)
 {
     FontResources *res = bold ? &b->bold : &b->normal;
-    if (!res->hb_font || !res->cairo_face)
+    if (!res->cairo_face)
 	return;
 
     unsigned int count;
+    double scaled_w = b->char_width * b->font_scale;
+    double base_y = py + b->char_ascent * b->font_scale;
+
+#ifdef USE_PANGO
+    if (!res->hb_font)
+	return;
+
     hb_glyph_info_t *info;
 
     uint32_t hash = 2166136261u;
@@ -889,6 +911,19 @@ draw_hb_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	memcpy(res->cache_glyph_infos, info,
 	       count * sizeof(hb_glyph_info_t));
     }
+#else
+    count = 0;
+    {
+	const char *p = text;
+	const char *end = text + text_len;
+	Rune r;
+	while (p < end) {
+	    if (utf8_decode(&p, &r) == 0)
+		break;
+	    count++;
+	}
+    }
+#endif
 
     int glyph_needed = (b->flags & CAIRO_FONT_OUTLINE) ? (int) count * 9 : (int) count;
 
@@ -904,9 +939,7 @@ draw_hb_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	res->glyph_cap = newcap;
     }
 
-    double scaled_w = b->char_width * b->font_scale;
-    double base_y = py + b->char_ascent * b->font_scale;
-
+#ifdef USE_PANGO
     for (unsigned int i = 0; i < count; i++) {
 	unsigned int cluster = info[i].cluster;
 	int rel_cell =
@@ -915,6 +948,23 @@ draw_hb_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	res->glyph_buf[i].x = px + rel_cell * scaled_w;
 	res->glyph_buf[i].y = base_y;
     }
+#else
+    {
+	const char *p = text;
+	Rune r;
+	unsigned int i = 0;
+	while (p < text + text_len && i < count) {
+	    int byteoff = (int) (p - text);
+	    if (utf8_decode(&p, &r) == 0)
+		break;
+	    int rel_cell = byteoff < text_len ? byte_cell[byteoff] : 0;
+	    res->glyph_buf[i].index = FT_Get_Char_Index(res->face, r);
+	    res->glyph_buf[i].x = px + rel_cell * scaled_w;
+	    res->glyph_buf[i].y = base_y;
+	    i++;
+	}
+    }
+#endif
 
     if (b->flags & CAIRO_FONT_OUTLINE) {
 	static const double off_x[OUTLINE_DIRS] = { -1, 0, 1, -1, 1, -1, 0, 1 };

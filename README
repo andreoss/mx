@@ -1,11 +1,13 @@
 mx - a minimal X11 terminal emulator.
 
 Linux:
-  deps: cairo fontconfig libxcb xcb-util-keysyms libxkbcommon harfbuzz freetype pkg-config
+  deps: cairo fontconfig libxcb xcb-util-keysyms libxkbcommon freetype harfbuzz pkg-config
   make && ./bin/mx
 
 OpenBSD:
-  pkg_add cairo fontconfig libxcb xcb-util-keysyms libxkbcommon harfbuzz
+  pkg_add cairo fontconfig libxcb xcb-util-keysyms libxkbcommon freetype harfbuzz
   make && ./bin/mx
 
 Test: make test   (needs a UTF-8 locale, e.g. LC_CTYPE=en_US.UTF-8)
+
+make USE_PANGO=0   builds without harfbuzz (plain FreeType glyphs, no shaping/ligatures).

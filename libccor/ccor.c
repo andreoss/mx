@@ -107,10 +107,23 @@ void apply_luminosity(float *lr, float *lg, float *lb, float target_lum)
 	*lb = target_lum * 0.0722f;
 	return;
     }
-    float s = target_lum / cur;
-    *lr *= s;
-    *lg *= s;
-    *lb *= s;
+
+    float max_c = fmaxf(*lr, fmaxf(*lg, *lb));
+    float min_c = fminf(*lr, fminf(*lg, *lb));
+
+    if (max_c - min_c > 0.1f * max_c) {
+        float s = target_lum / cur;
+        *lr *= s;
+        *lg *= s;
+        *lb *= s;
+    } else {
+        float sum = *lr + *lg + *lb;
+        float target_sum = target_lum / 0.3333f;
+        float s = target_sum / sum;
+        *lr *= s;
+        *lg *= s;
+        *lb *= s;
+    }
 }
 
 static const float xterm16_linear[16][3] = {
@@ -377,17 +390,19 @@ ColourCorrection colour_regression_ccm(const Palette *p)
     float M[4][3];
     solve_least_squares(M, A, Y, n);
 
+    float gain = (M[0][0] + M[1][1] + M[2][2]) / 3.0f;
+
     ColourCorrection cc;
     memset(&cc, 0, sizeof(cc));
-    cc.ccm[0][0] = M[0][0];
-    cc.ccm[0][1] = M[0][1];
-    cc.ccm[0][2] = M[0][2];
-    cc.ccm[1][0] = M[1][0];
-    cc.ccm[1][1] = M[1][1];
-    cc.ccm[1][2] = M[1][2];
-    cc.ccm[2][0] = M[2][0];
-    cc.ccm[2][1] = M[2][1];
-    cc.ccm[2][2] = M[2][2];
+    cc.ccm[0][0] = gain;
+    cc.ccm[0][1] = 0.0f;
+    cc.ccm[0][2] = 0.0f;
+    cc.ccm[1][0] = 0.0f;
+    cc.ccm[1][1] = gain;
+    cc.ccm[1][2] = 0.0f;
+    cc.ccm[2][0] = 0.0f;
+    cc.ccm[2][1] = 0.0f;
+    cc.ccm[2][2] = gain;
 
     float scale_r = M[3][0];
     float scale_g = M[3][1];
@@ -396,7 +411,7 @@ ColourCorrection colour_regression_ccm(const Palette *p)
     cc.brightness = powf(2.0f, (scale_r + scale_g + scale_b) / 3.0f);
     cc.gamma = 1.0f;
     cc.contrast = 1.0f;
-    cc.saturation = 1.0f;
+    cc.saturation = 2.0f;
     cc.tint = 0;
     cc.flags &= ~CC_INVERTED;
     cc.space = COLOUR_SPACE_NORMAL;
@@ -429,15 +444,15 @@ Argb colour_correct(const ColourCorrection *cc, Argb c)
 	g *= cc->brightness;
 	b *= cc->brightness;
     }
-    if (cc->saturation < 1.0f) {
+    if (cc->saturation != 1.0f) {
 	float lr = srgb_to_linear(r);
 	float lg = srgb_to_linear(g);
 	float lb = srgb_to_linear(b);
 	float lu = luma(lr, lg, lb);
 	float s = cc->saturation;
-	lr = lu + s * (lr - lu);
-	lg = lu + s * (lg - lu);
-	lb = lu + s * (lb - lu);
+	lr = fmaxf(0.0f, lu + s * (lr - lu));
+	lg = fmaxf(0.0f, lu + s * (lg - lu));
+	lb = fmaxf(0.0f, lu + s * (lb - lu));
 	r = linear_to_srgb(lr);
 	g = linear_to_srgb(lg);
 	b = linear_to_srgb(lb);

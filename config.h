@@ -92,7 +92,7 @@ static const char *frontend_default_colourname[16] attribute_unused = {
 #define FAINT_ALPHA 0.5
 #define CURSOR_WIDTH_NORMAL 1.5
 #define CURSOR_WIDTH_THICK 3.0
-#define MIN_CONTRAST 4.5f
+#define MIN_CONTRAST 11.0f
 #define CURSOR_ALPHA_MIN 0.004
 #define CURSOR_ALPHA_MAX 0.996
 #define FRAME_TIME_MS 16.7

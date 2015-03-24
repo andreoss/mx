@@ -103,6 +103,7 @@ typedef struct {
     int char_width, char_height;
     int char_ascent;
     int border_px;
+    int dpi;
     int win_width, win_height;
     char *font_string;
     FT_Library ft_lib;
@@ -367,6 +368,7 @@ static CairoBackend *backend_new(cairo_surface_t *sfc,
 	       "Terminus:size=12:antialias=false");
     if (dpi <= 0)
 	dpi = 96;
+    b->dpi = dpi;
     double pt_size = parse_font_size(b->font_string, 12);
     int pixel_size = parse_font_pixel_size(b->font_string);
     b->font_size = pixel_size > 0 ? pixel_size : (pt_size * dpi / 72.0);
@@ -1900,7 +1902,8 @@ cairo_draw_block_borders(CairoBackend *b, cairo_t *draw, const Screen *s)
     if (!regions)
 	return;
 
-    cairo_set_line_width(draw, 1.0);
+    double lw = (double) b->dpi / 96.0;
+    cairo_set_line_width(draw, 1.0 * lw);
 
     for (int i = 0; i < n; i++) {
 	Region *r = &regions[i];

@@ -19,6 +19,7 @@ enum {
     ATTR_INVISIBLE = 1 << 6,
     ATTR_STRUCK = 1 << 7,
     ATTR_WDUMMY = 1 << 10,
+    ATTR_GRAPH = 1 << 14,
     ATTR_BOLD_FAINT = ATTR_BOLD | ATTR_FAINT,
 };
 
@@ -60,6 +61,7 @@ typedef struct {
     Argb fg;
     Argb bg;
     Argb ul;
+    uint8_t graph;
 } Cell;
 typedef Cell *Line;
 #define LEN(a)        (sizeof(a) / sizeof((a)[0]))
@@ -79,5 +81,6 @@ static inline unsigned flag_set(unsigned flags, unsigned bit, int on)
 	((t1).tv_nsec - (t2).tv_nsec) / 1e6)
 #define UTF_SIZ           4
 #define ATTRCMP(a, b) ((a).attr != (b).attr || (a).fg != (b).fg || \
-		       (a).bg != (b).bg || (a).ul != (b).ul)
+		       (a).bg != (b).bg || (a).ul != (b).ul || \
+		       (a).graph != (b).graph)
 #endif

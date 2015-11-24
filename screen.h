@@ -8,6 +8,20 @@ enum {
     SCREEN_HAS_DIRTY = 1 << 1,
 };
 
+enum {
+    GRAPH_HIST_MAX = 2048,
+    GRAPH_IDS_MAX = 32,
+};
+
+typedef struct {
+    int id;
+    int used;
+    int count;
+    int head;
+    long mn, mx;
+    int32_t v[GRAPH_HIST_MAX];
+} GraphSeries;
+
 struct Screen {
     size_t cols, rows;
     Line *line;
@@ -23,6 +37,9 @@ struct Screen {
     Cell filler;
 
     int blink_count;
+
+    GraphSeries graphs[GRAPH_IDS_MAX];
+    int ngraphs;
 };
 
 typedef struct Screen Screen;
@@ -64,4 +81,9 @@ void screen_clean(Screen *s);
 
 
 int screen_has_blink(const Screen *s);
+
+
+void screen_graph_push(Screen *s, int id, long value, long mn, long mx);
+int screen_graph_read(const Screen *s, int id, int n, float *out);
+void screen_graph_clear(Screen *s);
 #endif

@@ -141,6 +141,7 @@ void term_reset(Term *t)
     t->cursor_state = CURSOR_DEFAULT;
     t->cursor_shape = CURSOR_SHAPE_BAR;
     t->last_rune = ' ';
+    screen_graph_clear(t->screen);
 }
 
 

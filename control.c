@@ -232,7 +232,8 @@ static void term_set_attr(Term *t, const int *attr, int l)
 	t->curcell.attr &= ~(ATTR_BOLD | ATTR_FAINT | ATTR_ITALIC |
 			     ATTR_UNDERLINE | ATTR_BLINK_SLOW |
 			     ATTR_BLINK_FAST | ATTR_REVERSE |
-			     ATTR_INVISIBLE | ATTR_STRUCK);
+			     ATTR_INVISIBLE | ATTR_STRUCK |
+			     ATTR_GRAPH);
 	t->curcell.fg = PAL_DEFAULT_FG;
 	t->curcell.bg = PAL_DEFAULT_BG;
 	t->curcell.ul = PAL_DEFAULT_FG;
@@ -244,7 +245,8 @@ static void term_set_attr(Term *t, const int *attr, int l)
 	    t->curcell.attr &= ~(ATTR_BOLD | ATTR_FAINT | ATTR_ITALIC |
 				 ATTR_UNDERLINE | ATTR_BLINK_SLOW |
 				 ATTR_BLINK_FAST | ATTR_REVERSE |
-				 ATTR_INVISIBLE | ATTR_STRUCK);
+				 ATTR_INVISIBLE | ATTR_STRUCK |
+				 ATTR_GRAPH);
 	    t->curcell.fg = PAL_DEFAULT_FG;
 	    t->curcell.bg = PAL_DEFAULT_BG;
 	    t->curcell.ul = PAL_DEFAULT_FG;
@@ -1260,8 +1262,48 @@ static void esc_handle(Term *t, uint8_t prefix, uint8_t b)
 
 
 
+static void term_graph_open(Term *t, const char *p)
+{
+    char *end;
+    long field[4];
+    for (int i = 0; i < 4; i++) {
+	if (*p == ';')
+	    p++;
+	field[i] = strtol(p, &end, 10);
+	if (end == p)
+	    return;
+	p = end;
+    }
+    int id = (int) field[0];
+    if (id < 0 || id > 254)
+	return;
+    screen_graph_push(t->screen, id, field[3], field[1], field[2]);
+    t->curcell.attr |= ATTR_GRAPH;
+    t->curcell.graph = (uint8_t) id;
+}
+
+static void term_graph_close(Term *t)
+{
+    t->curcell.attr &= ~ATTR_GRAPH;
+    t->curcell.graph = 0;
+}
+
+static void term_apc(Term *t, const Event *ev)
+{
+    const char *s = ev->data.str.buf;
+    if (!s || s[0] != 'G')
+	return;
+    if (s[1] == 'o')
+	term_graph_open(t, s + 2);
+    else if (s[1] == 'c')
+	term_graph_close(t);
+}
+
+
+
 static void term_control_code(Term *t, uint8_t ascii)
 {
+    term_graph_close(t);
     switch (ascii) {
     case '\t':
 	term_put_tab(t, 1);
@@ -1329,8 +1371,10 @@ static void control_dispatch(Term *t, const Event *ev)
     case EVENT_ESC:
 	esc_handle(t, ev->data.esc.prefix, ev->data.esc.b);
 	break;
-    case EVENT_DCS:
     case EVENT_APC:
+	term_apc(t, ev);
+	break;
+    case EVENT_DCS:
     case EVENT_PM:
 	break;
     default:

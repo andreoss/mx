@@ -1251,6 +1251,56 @@ cairo_frame(void *ctx, const Screen *s,
 	    cairo_restore(draw);
 	}
 
+	int ppd = b->dpi >= 140 ? 2 : 1;
+	for (y = fy1; y <= fy2; y++) {
+	    const uint8_t *flags = b->repaint + (size_t) y * cols;
+	    Cell *drow = b->drawn + (size_t) y * cols;
+	    x = 0;
+	    while (x < cols) {
+		if (!(drow[x].attr & ATTR_GRAPH)) {
+		    x++;
+		    continue;
+		}
+		int id = drow[x].graph;
+		int x0 = x;
+		int dirty = 0;
+		while (x < cols && (drow[x].attr & ATTR_GRAPH)
+		       && drow[x].graph == id) {
+		    if (flags[x])
+			dirty = 1;
+		    x++;
+		}
+		if (!dirty)
+		    continue;
+		int efg, ebg;
+		cell_effective(drow[x0], &efg, &ebg);
+		Argb bar, bgc;
+		resolve_palette(b, efg, &bar);
+		resolve_palette(b, ebg, &bgc);
+		bar = colour_min_contrast(bar, bgc, MIN_CONTRAST);
+		double br, bgn, bb;
+		argb_to_rgb(bar, &br, &bgn, &bb);
+		int ncols = (x - x0) * cw / ppd;
+		if (ncols < 1)
+		    ncols = 1;
+		if (ncols > 4096)
+		    ncols = 4096;
+		float fr[4096];
+		int got = screen_graph_read(s, id, ncols, fr);
+		int basex = bp + x0 * cw;
+		int basey = bp + y * ch;
+		cairo_set_source_rgba(draw, br, bgn, bb, 0.85);
+		for (int i = 0; i < got; i++) {
+		    double h = fr[i] * ch;
+		    if (h < 1.0)
+			h = 1.0;
+		    cairo_rectangle(draw, basex + i * ppd,
+				    basey + (ch - h), ppd, h);
+		}
+		cairo_fill(draw);
+	    }
+	}
+
 	int cur_bold = -1;
 	for (y = fy1; y <= fy2; y++) {
 	    const uint8_t *flags = b->repaint + (size_t) y * cols;
@@ -1258,7 +1308,7 @@ cairo_frame(void *ctx, const Screen *s,
 	    x = 0;
 	    while (x < cols) {
 		Cell first = drow[x];
-		if (first.r == 0 || (first.attr & ATTR_WDUMMY)) {
+		if (first.r == 0 || (first.attr & (ATTR_WDUMMY | ATTR_GRAPH))) {
 		    x++;
 		    continue;
 		}

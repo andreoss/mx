@@ -144,6 +144,7 @@ static void dump_mode(const Term *term)
 	{ ATTR_REVERSE, 'R' }, { ATTR_BOLD, 'B' }, { ATTR_UNDERLINE, 'U' },
 	{ ATTR_FAINT, 'D' }, { ATTR_BLINK, 'K' }, { ATTR_ITALIC, 'I' },
 	{ ATTR_INVISIBLE, 'X' }, { ATTR_STRUCK, 'S' },
+	{ ATTR_GRAPH, 'G' },
     };
     const Screen *s = term_screen(term);
     int cols = screen_cols(s);

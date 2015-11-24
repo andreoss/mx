@@ -439,3 +439,67 @@ int screen_has_blink(const Screen *s)
 {
     return s->blink_count > 0;
 }
+
+static GraphSeries *graph_series(Screen *s, int id)
+{
+    for (int i = 0; i < s->ngraphs; i++)
+	if (s->graphs[i].id == id)
+	    return &s->graphs[i];
+    GraphSeries *g;
+    if (s->ngraphs >= GRAPH_IDS_MAX) {
+	memmove(s->graphs, s->graphs + 1,
+		(GRAPH_IDS_MAX - 1) * sizeof(*g));
+	g = &s->graphs[GRAPH_IDS_MAX - 1];
+    } else {
+	g = &s->graphs[s->ngraphs++];
+    }
+    memset(g, 0, sizeof(*g));
+    g->id = id;
+    return g;
+}
+
+void screen_graph_push(Screen *s, int id, long value, long mn, long mx)
+{
+    GraphSeries *g = graph_series(s, id);
+    g->mn = mn;
+    g->mx = mx;
+    if (g->count < GRAPH_HIST_MAX)
+	g->v[(g->head + g->count++) % GRAPH_HIST_MAX] = (int32_t) value;
+    else {
+	g->v[g->head] = (int32_t) value;
+	g->head = (g->head + 1) % GRAPH_HIST_MAX;
+    }
+}
+
+int screen_graph_read(const Screen *s, int id, int n, float *out)
+{
+    const GraphSeries *g = NULL;
+    for (int i = 0; i < s->ngraphs; i++)
+	if (s->graphs[i].id == id) {
+	    g = &s->graphs[i];
+	    break;
+	}
+    if (!g || g->count == 0 || n <= 0)
+	return 0;
+    long span = g->mx - g->mn;
+    for (int i = 0; i < n; i++) {
+	int from_old = i - (n - g->count);
+	if (from_old < 0)
+	    from_old = 0;
+	if (from_old > g->count - 1)
+	    from_old = g->count - 1;
+	long v = g->v[(g->head + from_old) % GRAPH_HIST_MAX];
+	float f = span != 0 ? (float) (v - g->mn) / (float) span : 0.0f;
+	if (f < 0.0f)
+	    f = 0.0f;
+	if (f > 1.0f)
+	    f = 1.0f;
+	out[i] = f;
+    }
+    return n;
+}
+
+void screen_graph_clear(Screen *s)
+{
+    s->ngraphs = 0;
+}

@@ -2,6 +2,7 @@ include config.mk
 
 BINDIR = ./bin
 TEST_DIR = t
+CCOR_H = libccor/ccor.h
 
 OBJS = control.o parser.o \
             pty.o proc.o region.o screen.o term.o utf8.o \
@@ -12,7 +13,7 @@ TOBJS = utf8.o parser.o screen.o control.o term.o \
 
 all: $(BINDIR)/mx libccor/libccor.a
 
-libccor/libccor.a:
+libccor/libccor.a: libccor/ccor.c $(CCOR_H)
 	cd libccor && $(MAKE)
 
 $(BINDIR)/mx: $(OBJS) libccor/libccor.a
@@ -24,10 +25,27 @@ $(BINDIR)/mx: $(OBJS) libccor/libccor.a
 .c.o:
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(TEST_DIR)/mx-test: $(TOBJS) $(TEST_DIR)/mx-test.c libccor/libccor.a
+config.o: config.h $(CCOR_H)
+control.o: control.h parser.h screen.h term.h types.h utf8.h $(CCOR_H)
+frontend.o: frontend.h parser.h screen.h term.h types.h $(CCOR_H)
+frontend-cairo.o: config.h frontend.h parser.h region.h screen.h term.h \
+	  types.h utf8.h $(CCOR_H)
+main.o: config.h frontend.h parser.h proc.h pty.h screen.h term.h \
+	  types.h utf8.h $(CCOR_H)
+parser.o: parser.h types.h utf8.h $(CCOR_H)
+proc.o: proc.h pty.h
+pty.o: config.h pty.h types.h $(CCOR_H)
+region.o: region.h screen.h types.h $(CCOR_H)
+screen.o: screen.h types.h $(CCOR_H)
+term.o: config.h control.h parser.h screen.h term.h types.h utf8.h $(CCOR_H)
+utf8.o: types.h utf8.h $(CCOR_H)
+
+$(TEST_DIR)/mx-test: $(TOBJS) $(TEST_DIR)/mx-test.c libccor/libccor.a \
+	  parser.h screen.h term.h types.h utf8.h $(CCOR_H)
 	$(CC) $(CFLAGS) -I. -o $@ $(TEST_DIR)/mx-test.c $(TOBJS) libccor/libccor.a $(LDFLAGS) -lm
 
-$(TEST_DIR)/test-region: $(TEST_DIR)/test-region.c region.o screen.o
+$(TEST_DIR)/test-region: $(TEST_DIR)/test-region.c region.o screen.o \
+	  region.h screen.h types.h $(CCOR_H)
 	$(CC) -std=c99 $(FEATURE) -I. -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -o $@ $(TEST_DIR)/test-region.c region.o screen.o $(LDFLAGS) -lm
 
 test: test-mock test-region test-colour-correct

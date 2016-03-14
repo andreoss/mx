@@ -194,57 +194,97 @@ const char *term_title(const Term *t)
 
 
 
-static int is_word_char(Rune r)
+enum {
+    CLASS_SPACE,
+    CLASS_WORD,
+    CLASS_OTHER,
+};
+
+static int rune_class(Rune r)
 {
-    return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-	(r >= '0' && r <= '9') || r == '_';
+    if (r == 0 || r == ' ')
+	return CLASS_SPACE;
+    if ((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+	(r >= '0' && r <= '9') || r == '_' || r >= 0x80)
+	return CLASS_WORD;
+    return CLASS_OTHER;
+}
+
+static int cell_class(const Screen *s, int x, int y)
+{
+    Cell c = screen_get(s, x, y);
+    while ((c.attr & ATTR_WDUMMY) && x > 0)
+	c = screen_get(s, --x, y);
+    return rune_class(c.r);
+}
+
+static int line_end(const Screen *s, int y)
+{
+    int x = (int) screen_cols(s) - 1;
+    while (x > 0 && cell_class(s, x, y) == CLASS_SPACE)
+	x--;
+    return x;
+}
+
+static void sel_snap(const Screen *s, SelectionSnap snap, int x, int y,
+		     int *x1, int *x2)
+{
+    int cols = (int) screen_cols(s);
+    *x1 = x;
+    *x2 = x;
+    if (snap == SNAP_LINE) {
+	*x1 = 0;
+	*x2 = line_end(s, y);
+	return;
+    }
+    if (snap != SNAP_WORD)
+	return;
+    int cls = cell_class(s, x, y);
+    while (*x1 > 0 && cell_class(s, *x1 - 1, y) == cls)
+	(*x1)--;
+    while (*x2 < cols - 1 && cell_class(s, *x2 + 1, y) == cls)
+	(*x2)++;
 }
 
 static Selection selection;
 
 void term_sel_start(Term *t, int x, int y, SelectionSnap snap)
 {
+    int x1, x2;
+
+    sel_snap(t->screen, snap, x, y, &x1, &x2);
+
     selection.flags |= SELECTION_ACTIVE;
-    selection.origin_x = x;
-    selection.origin_y = y;
-    selection.start_x = x;
+    selection.snap = snap;
+    selection.anchor_x1 = x1;
+    selection.anchor_y1 = y;
+    selection.anchor_x2 = x2;
+    selection.anchor_y2 = y;
+    selection.start_x = x1;
     selection.start_y = y;
-    selection.end_x = x;
+    selection.end_x = x2;
     selection.end_y = y;
-    if (snap == SNAP_WORD) {
-	Cell cur = screen_get(t->screen, x, y);
-	if (is_word_char(cur.r)) {
-	    while (selection.start_x > 0) {
-		Cell c = screen_get(t->screen, selection.start_x - 1,
-				    selection.start_y);
-		if (!is_word_char(c.r))
-		    break;
-		selection.start_x--;
-	    }
-	    while (selection.end_x < (int)screen_cols(t->screen) - 1) {
-		Cell c = screen_get(t->screen, selection.end_x + 1,
-				    selection.start_y);
-		if (!is_word_char(c.r))
-		    break;
-		selection.end_x++;
-	    }
-	}
-    }
 }
 
 void term_sel_extend(Term *t, int x, int y)
 {
+    int x1, x2;
+
     if (!(selection.flags & SELECTION_ACTIVE))
 	return;
-    if (y < selection.origin_y || (y == selection.origin_y && x < selection.origin_x)) {
-	selection.start_x = x;
+
+    sel_snap(t->screen, selection.snap, x, y, &x1, &x2);
+
+    if (y < selection.anchor_y1
+	|| (y == selection.anchor_y1 && x1 < selection.anchor_x1)) {
+	selection.start_x = x1;
 	selection.start_y = y;
-	selection.end_x = selection.origin_x;
-	selection.end_y = selection.origin_y;
+	selection.end_x = selection.anchor_x2;
+	selection.end_y = selection.anchor_y2;
     } else {
-	selection.start_x = selection.origin_x;
-	selection.start_y = selection.origin_y;
-	selection.end_x = x;
+	selection.start_x = selection.anchor_x1;
+	selection.start_y = selection.anchor_y1;
+	selection.end_x = x2;
 	selection.end_y = y;
     }
 }

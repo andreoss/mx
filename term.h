@@ -59,13 +59,17 @@ int cursor_shape_blinks(int shape);
 typedef enum {
     SNAP_NONE,
     SNAP_WORD,
+    SNAP_LINE,
 } SelectionSnap;
 
 typedef struct {
     int start_x, start_y;
     int end_x, end_y;
 
-    int origin_x, origin_y;
+    int anchor_x1, anchor_y1;
+    int anchor_x2, anchor_y2;
+
+    SelectionSnap snap;
 
     unsigned flags;
 } Selection;

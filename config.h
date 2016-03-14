@@ -111,6 +111,7 @@ extern const char *preferred_fonts[4];
 #define CURSOR_TICK_DELAY_MS 33.0
 #define FONT_SCALE_INIT 1.0
 #define CTRL_S_TIMEOUT_MS 2000
+#define DOUBLE_CLICK_MS 400
 #define TABS 8
 
 #define TERM_TYPE "xterm-256color"

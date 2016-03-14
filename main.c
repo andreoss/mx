@@ -471,6 +471,9 @@ static void event_coords(int ex, int ey, int *col, int *row)
 
 struct Input {
     int buttons;
+    struct timespec last_click;
+    int last_col, last_row;
+    int click_count;
 };
 
 static Input *input_new(void)
@@ -483,10 +486,11 @@ static void input_free(Input *t)
     free(t);
 }
 
-static void input_sel_start(Term *term, int col, int row)
+static void input_sel_start(Term *term, int col, int row,
+			    SelectionSnap snap)
 {
     term_sel_clear(term);
-    term_sel_start(term, col, row, SNAP_NONE);
+    term_sel_start(term, col, row, snap);
     term_dirty(term);
     clock_gettime(CLOCK_MONOTONIC, &draw_trigger);
     flags |= FLAG_DRAWING;
@@ -550,8 +554,25 @@ static void input_mouse(Input *t, int button, unsigned int modmask,
 	}
 	if (type == MOUSE_PRESS) {
 	    if (button == 1 && (!sgr || (modmask & XCB_MOD_MASK_SHIFT))) {
+		struct timespec now;
+		SelectionSnap snap = SNAP_NONE;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		if (t->click_count > 0 && col == t->last_col
+		    && row == t->last_row
+		    && TIMEDIFF_MS(now, t->last_click) < DOUBLE_CLICK_MS)
+		    t->click_count++;
+		else
+		    t->click_count = 1;
+		t->last_click = now;
+		t->last_col = col;
+		t->last_row = row;
+		if (t->click_count >= 3)
+		    snap = SNAP_LINE;
+		else if (t->click_count == 2)
+		    snap = (modmask & XCB_MOD_MASK_SHIFT) ? SNAP_LINE
+			: SNAP_WORD;
 		t->buttons |= 1;
-		input_sel_start(term, col, row);
+		input_sel_start(term, col, row, snap);
 		return;
 	    }
 	}

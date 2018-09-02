@@ -20,6 +20,9 @@
 #define FLASH_MIN      0.01
 #define GLOW_LAYERS    3
 #define OUTLINE_DIRS   8
+#define GLYPH_DIRECT      256
+#define GLYPH_CACHE_SIZE  2048
+#define GLYPH_CACHE_PROBE 4
 
 static void argb_to_rgb(Argb c, double *r, double *g, double *b)
 {
@@ -70,11 +73,18 @@ draw_region_gradient(cairo_t *draw, int xa, int ya, int xb, int yb,
 
 
 typedef struct {
+    Rune key;
+    unsigned int index;
+} GlyphCacheEnt;
+
+typedef struct {
     FT_Face face;
     cairo_font_face_t *cairo_face;
     int pixel_size;
     cairo_glyph_t *glyph_buf;
     int glyph_cap;
+    unsigned int gdirect[GLYPH_DIRECT];
+    GlyphCacheEnt gcache[GLYPH_CACHE_SIZE];
 } FontResources;
 
 
@@ -792,6 +802,32 @@ static void cell_effective(Cell c, int *fg, int *bg)
     *bg = g;
 }
 
+static unsigned int glyph_index_for(FontResources *res, Rune r)
+{
+    if (r < GLYPH_DIRECT) {
+	unsigned int v = res->gdirect[r];
+	if (v)
+	    return v - 1;
+	unsigned int gi = FT_Get_Char_Index(res->face, r);
+	res->gdirect[r] = gi + 1;
+	return gi;
+    }
+
+    unsigned int mask = GLYPH_CACHE_SIZE - 1;
+    unsigned int h = ((unsigned int) (r * 2654435761u) >> 20) & mask;
+    for (unsigned int i = 0; i < GLYPH_CACHE_PROBE; i++) {
+	GlyphCacheEnt *e = &res->gcache[(h + i) & mask];
+	if (e->key == r)
+	    return e->index;
+	if (!e->key) {
+	    e->key = r;
+	    e->index = FT_Get_Char_Index(res->face, r);
+	    return e->index;
+	}
+    }
+    return FT_Get_Char_Index(res->face, r);
+}
+
 static void
 draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	     const char *text, const uint16_t *byte_cell, int text_len,
@@ -840,7 +876,7 @@ draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	    if (utf8_decode(&p, &r) == 0)
 		break;
 	    int rel_cell = byteoff < text_len ? byte_cell[byteoff] : 0;
-	    res->glyph_buf[i].index = FT_Get_Char_Index(res->face, r);
+	    res->glyph_buf[i].index = glyph_index_for(res, r);
 	    res->glyph_buf[i].x = px + rel_cell * scaled_w;
 	    res->glyph_buf[i].y = base_y;
 	    i++;

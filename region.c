@@ -10,11 +10,6 @@ Cell screen_plane_at(const void *ctx, int x, int y)
     return screen_get(sp->s, x, y);
 }
 
-static int cell_bg(const Plane *p, int x, int y)
-{
-    return p->at(p->ctx, x, y).bg;
-}
-
 Region *region_compute(const Plane *p, int cols, int rows,
 		       int *nout, uint8_t *visited)
 {
@@ -26,8 +21,24 @@ Region *region_compute(const Plane *p, int cols, int rows,
 	    return NULL;
 	}
 	alloc_visited = 1;
-    } else {
-	memset(visited, 0, (size_t) cols * rows);
+    }
+
+    size_t ncells = (size_t) cols * rows;
+    int *bg = malloc(ncells * sizeof(int));
+    if (!bg) {
+	if (alloc_visited)
+	    free(visited);
+	*nout = 0;
+	return NULL;
+    }
+
+    for (int y = 0; y < rows; y++) {
+	size_t row = (size_t) y * cols;
+	for (int x = 0; x < cols; x++) {
+	    Cell c = p->at(p->ctx, x, y);
+	    bg[row + x] = c.bg;
+	    visited[row + x] = (c.r > 0 && c.r < 0x110000) ? 2 : 0;
+	}
     }
 
     Region *regions = NULL;
@@ -35,22 +46,23 @@ Region *region_compute(const Plane *p, int cols, int rows,
     int cap = 0;
 
     for (int y = 0; y < rows; y++) {
+	size_t row = (size_t) y * cols;
 	for (int x = 0; x < cols; x++) {
-	    int idx = y * cols + x;
-	    if (visited[idx])
+	    if (visited[row + x] & 1)
 		continue;
 
-	    int bg = cell_bg(p, x, y);
+	    int bgc = bg[row + x];
 
 	    int x0 = x;
-	    while (x0 < cols && cell_bg(p, x0, y) == bg)
+	    while (x0 < cols && bg[row + x0] == bgc)
 		x0++;
 
 	    int y0 = y;
 	    while (y0 < rows) {
+		size_t erow = (size_t) y0 * cols;
 		int ok = 1;
 		for (int tx = x; tx < x0; tx++) {
-		    if (cell_bg(p, tx, y0) != bg) {
+		    if (bg[erow + tx] != bgc) {
 			ok = 0;
 			break;
 		    }
@@ -62,13 +74,11 @@ Region *region_compute(const Plane *p, int cols, int rows,
 
 	    int has_printable = 0;
 	    for (int ry = y; ry < y0; ry++) {
+		size_t rrow = (size_t) ry * cols;
 		for (int rx = x; rx < x0; rx++) {
-		    if (!has_printable) {
-			Cell c = p->at(p->ctx, rx, ry);
-			if (c.r > 0 && c.r < 0x110000)
-			    has_printable = 1;
-		    }
-		    visited[ry * cols + rx] = 1;
+		    if (visited[rrow + rx] & 2)
+			has_printable = 1;
+		    visited[rrow + rx] |= 1;
 		}
 	    }
 
@@ -77,6 +87,7 @@ Region *region_compute(const Plane *p, int cols, int rows,
 		Region *tmp =
 		    realloc(regions, (size_t) cap * sizeof(Region));
 		if (!tmp) {
+		    free(bg);
 		    if (alloc_visited)
 			free(visited);
 		    free(regions);
@@ -87,10 +98,11 @@ Region *region_compute(const Plane *p, int cols, int rows,
 	    }
 
 	    regions[nregions++] = (Region) {
-		.bounds = {x, y, x0, y0}, .bg = bg, .flags = has_printable ? REGION_HAS_PRINTABLE : 0};
+		.bounds = {x, y, x0, y0}, .bg = bgc, .flags = has_printable ? REGION_HAS_PRINTABLE : 0};
 	}
     }
 
+    free(bg);
     if (alloc_visited)
 	free(visited);
     *nout = nregions;

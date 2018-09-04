@@ -51,27 +51,6 @@ static int attr_faint(Attr a)
 }
 
 
-static void
-draw_region_gradient(cairo_t *draw, int xa, int ya, int xb, int yb,
-		     Argb bg_c)
-{
-    cairo_pattern_t *grad = cairo_pattern_create_linear(xa, ya, xa, yb);
-    double r0, g0, b0;
-    argb_to_rgb(bg_c, &r0, &g0, &b0);
-    cairo_pattern_add_color_stop_rgba(grad, 0.0, r0 * 1.08, g0 * 1.08,
-				      b0 * 1.08, 1.0);
-    cairo_pattern_add_color_stop_rgba(grad, 1.0, r0 * 0.92, g0 * 0.92,
-				      b0 * 0.92, 1.0);
-    cairo_save(draw);
-    cairo_rectangle(draw, xa, ya, xb - xa, yb - ya);
-    cairo_clip(draw);
-    cairo_set_source(draw, grad);
-    cairo_paint(draw);
-    cairo_restore(draw);
-    cairo_pattern_destroy(grad);
-}
-
-
 typedef struct {
     Rune key;
     unsigned int index;
@@ -105,7 +84,7 @@ enum {
 
 
 
-typedef struct {
+struct CairoBackend {
     cairo_surface_t *output;
     cairo_t *cr;
     const Palette *pal;
@@ -147,15 +126,58 @@ typedef struct {
     cairo_pattern_t *dim_right;
     double dim_cache_w;
     Argb dim_cache_bell;
+
+    cairo_pattern_t *grad_cache;
+    Argb grad_bg;
+    int grad_h;
     double dim_cache_alpha;
 
     FontResources normal;
     FontResources bold;
 
      Argb cc_cache[PAL_SIZE];
-    unsigned cc_cache_gen;
+     unsigned cc_cache_gen;
     unsigned flags;
-} CairoBackend;
+};
+
+typedef struct CairoBackend CairoBackend;
+
+static void
+draw_region_gradient(CairoBackend *b, cairo_t *draw, int xa, int ya,
+		     int xb, int yb, Argb bg_c)
+{
+    int h = yb - ya;
+    if (h <= 0)
+	return;
+
+    if (!b->grad_cache || b->grad_bg != bg_c || b->grad_h != h) {
+	if (b->grad_cache)
+	    cairo_pattern_destroy(b->grad_cache);
+	double r0, g0, b0;
+	argb_to_rgb(bg_c, &r0, &g0, &b0);
+	cairo_pattern_t *grad = cairo_pattern_create_linear(0, 0, 0, h);
+	cairo_pattern_add_color_stop_rgba(grad, 0.0, r0 * GRAD_LIGHT,
+					  g0 * GRAD_LIGHT, b0 * GRAD_LIGHT,
+					  1.0);
+	cairo_pattern_add_color_stop_rgba(grad, 1.0, r0 * GRAD_DARK,
+					  g0 * GRAD_DARK, b0 * GRAD_DARK,
+					  1.0);
+	b->grad_cache = grad;
+	b->grad_bg = bg_c;
+	b->grad_h = h;
+    }
+
+    cairo_matrix_t m;
+    cairo_matrix_init_translate(&m, -xa, -ya);
+    cairo_pattern_set_matrix(b->grad_cache, &m);
+
+    cairo_save(draw);
+    cairo_rectangle(draw, xa, ya, xb - xa, h);
+    cairo_clip(draw);
+    cairo_set_source(draw, b->grad_cache);
+    cairo_paint(draw);
+    cairo_restore(draw);
+}
 
 enum {
     CAIRO_FOCUS_DIM = 1 << 0,
@@ -578,6 +600,8 @@ static void cairo_free(void *ctx)
 	cairo_pattern_destroy(b->dim_left);
     if (b->dim_right)
 	cairo_pattern_destroy(b->dim_right);
+    if (b->grad_cache)
+	cairo_pattern_destroy(b->grad_cache);
     cairo_destroy(b->cr);
     font_resources_destroy(&b->normal);
     font_resources_destroy(&b->bold);
@@ -642,6 +666,10 @@ static void cairo_resize(void *ctx, int cols, int rows)
     if (b->dim_right) {
 	cairo_pattern_destroy(b->dim_right);
 	b->dim_right = NULL;
+    }
+    if (b->grad_cache) {
+	cairo_pattern_destroy(b->grad_cache);
+	b->grad_cache = NULL;
     }
     free(b->border_visited);
     b->border_visited = NULL;
@@ -1280,8 +1308,9 @@ cairo_frame(void *ctx, const Screen *s,
 		    continue;
 		Argb bg_c;
 		resolve_palette(b, r->bg, &bg_c);
-		draw_region_gradient(draw, bp + r->bounds.x0 * cw,
-				     bp + r->bounds.y0 * ch, bp + r->bounds.x1 * cw,
+		draw_region_gradient(b, draw, bp + r->bounds.x0 * cw,
+				     bp + r->bounds.y0 * ch,
+				     bp + r->bounds.x1 * cw,
 				     bp + r->bounds.y1 * ch, bg_c);
 	    }
 	    cairo_restore(draw);

@@ -371,17 +371,34 @@ int parser_feed(Parser *p, const char *buf, size_t len, Event *ev, int cap)
 	    if (c >= 0xE0 && c <= 0xF4) {
 		int needed = (c >= 0xF0) ? 4 : 3;
 		if (i + (size_t) needed <= len) {
-		    const char *cp = buf + i;
-		    Rune r;
-		    size_t dlen = utf8_decode(&cp, &r);
-		    if (dlen > 0) {
-			if (n < cap) {
-			    ev[n].type = EVENT_PRINT;
-			    ev[n].data.r = r;
-			    n++;
+		    uint8_t t1 = (uint8_t) buf[i + 1];
+		    uint8_t t2 = (uint8_t) buf[i + 2];
+		    uint8_t t3 = needed == 4 ? (uint8_t) buf[i + 3] : 0x80;
+		    if ((t1 & 0xC0) == 0x80 && (t2 & 0xC0) == 0x80
+			&& (t3 & 0xC0) == 0x80) {
+			Rune r;
+			if (needed == 3)
+			    r = ((Rune) (c & 0x0F) << 12)
+				| ((Rune) (t1 & 0x3F) << 6)
+				| (Rune) (t2 & 0x3F);
+			else
+			    r = ((Rune) (c & 0x07) << 18)
+				| ((Rune) (t1 & 0x3F) << 12)
+				| ((Rune) (t2 & 0x3F) << 6)
+				| (Rune) (t3 & 0x3F);
+			if ((needed == 3 && r >= 0x800)
+			    || (needed == 4 && r >= 0x10000)) {
+			    if (r > 0x10FFFF
+				|| (r >= 0xD800 && r <= 0xDFFF))
+				r = 0xFFFD;
+			    if (n < cap) {
+				ev[n].type = EVENT_PRINT;
+				ev[n].data.r = r;
+				n++;
+			    }
+			    i += needed;
+			    continue;
 			}
-			i += dlen;
-			continue;
 		    }
 		}
 

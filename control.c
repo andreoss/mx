@@ -626,9 +626,39 @@ static void csi_handle(Term *t, const Event *ev)
 	break;
     case 'b':
 	LIMIT(arg[0], 1, 65535);
-	if (t->last_rune)
+	if (t->last_rune) {
+	    int cols = (int) screen_cols(t->screen);
+	    int rows = (int) screen_rows(t->screen);
+	    int fast = (t->mode & MODE_WRAP) && !(t->mode & MODE_INSERT)
+		&& t->charset_table[t->cur_charset] != CS_DEC_GRAPHICS
+		&& !(t->cursor_state & (CURSOR_WRAPNEXT | CURSOR_INPUT_NEEDS_WRAP))
+		&& t->last_rune >= 0x20 && t->last_rune <= 0x7E
+		&& t->cx >= 0 && t->cx < cols && t->cy >= 0 && t->cy < rows;
+
+	    if (fast) {
+		Cell cells[PRINT_RUN_MAX];
+		Cell base = t->curcell;
+		base.r = t->last_rune;
+		for (int i = 0; i < PRINT_RUN_MAX; i++)
+		    cells[i] = base;
+
+		int left = arg[0];
+		while (left > 0 && t->cx < cols) {
+		    int m = MIN(left, MIN(cols - t->cx, PRINT_RUN_MAX));
+		    screen_put_cells(t->screen, t->cx, t->cy, cells, m);
+		    t->cx += m;
+		    left -= m;
+		    if (t->cx >= cols) {
+			t->cx = cols - 1;
+			t->cursor_state |= CURSOR_WRAPNEXT;
+			break;
+		    }
+		}
+		arg[0] = left;
+	    }
 	    while (arg[0]-- > 0)
 		term_putc(t, t->last_rune);
+	}
 	break;
     case 'C':
     case 'a':

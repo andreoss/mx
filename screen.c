@@ -124,14 +124,24 @@ static Line *curbuf(Screen *s)
 
 static void fill_cells(Screen *s, Line buf, size_t x0, size_t n)
 {
-    if (s->blink_count)
+    if (!n)
+	return;
+
+    if (s->blink_count) {
 	for (size_t k = 0; k < n; k++) {
 	    s->blink_count -= cell_has_blink(buf[x0 + k]);
 	    buf[x0 + k] = s->filler;
 	}
-    else
-	for (size_t k = 0; k < n; k++)
-	    buf[x0 + k] = s->filler;
+	return;
+    }
+
+    buf[x0] = s->filler;
+    size_t done = 1;
+    while (done < n) {
+	size_t chunk = MIN(done, n - done);
+	memcpy(&buf[x0 + done], &buf[x0], chunk * sizeof(Cell));
+	done += chunk;
+    }
 }
 
 void screen_clear(Screen *s)

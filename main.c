@@ -49,7 +49,7 @@ typedef enum {
 
 #define BUF_TITLE 256
 #define BUF_EVENT 1024
-#define BUF_PTY   8196
+#define BUF_PTY   65536
 
 #define CTRL_MASK 0x1F
 #define KEY_DEL   0x7F

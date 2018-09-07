@@ -12,6 +12,8 @@
 #include "pty.h"
 #include "types.h"
 
+#define PTY_WRITE_CHUNK 65536
+
 struct Pty {
     int master;
     int slave;
@@ -216,7 +218,7 @@ void pty_flush(Pty *p)
     size_t off = 0;
     while (off < p->wlen) {
 	ssize_t n = write(p->master, p->wbuf + off,
-			  MIN(p->wlen - off, 255));
+			  MIN(p->wlen - off, PTY_WRITE_CHUNK));
 	if (n < 0) {
 	    if (errno == EINTR)
 		continue;
@@ -241,7 +243,7 @@ void pty_write(Pty *p, const char *buf, size_t len)
 	return;
     }
     while (len > 0) {
-	ssize_t n = write(p->master, buf, MIN(len, 255));
+	ssize_t n = write(p->master, buf, MIN(len, PTY_WRITE_CHUNK));
 	if (n < 0) {
 	    if (errno == EAGAIN) {
 		pty_queue(p, buf, len);

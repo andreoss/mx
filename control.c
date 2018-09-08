@@ -517,14 +517,24 @@ static int term_putc_run(Term *t, const Event *ev, int start, int nev)
 	int m = 0;
 	int i = start;
 
-	while (i < nev && m < PRINT_RUN_MAX && x < cols
+	while (i < nev && m < PRINT_RUN_MAX - 1 && x < cols
 	       && ev[i].type == EVENT_PRINT) {
 	    Rune r = ev[i].data.r;
-	    if (r < 0x20 || r > 0x7E)
+	    if (r < 0x20 || (r >= 0x7F && r < 0xA0))
+		break;
+	    int w = wcwidth_safe((wchar_t) r);
+	    if (w < 1)
+		w = 1;
+	    if (x + w > cols)
 		break;
 	    base.r = r;
 	    cells[m++] = base;
 	    x++;
+	    if (w == 2) {
+		Cell wdummy = { .r = '\0', .attr = ATTR_WDUMMY };
+		cells[m++] = wdummy;
+		x++;
+	    }
 	    i++;
 	}
 

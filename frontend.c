@@ -78,6 +78,12 @@ void frontend_damage(const FrontendProto *r)
 	r->damage(r->ctx);
 }
 
+void frontend_invalidate(const FrontendProto *r)
+{
+    if (r->invalidate)
+	r->invalidate(r->ctx);
+}
+
 void frontend_bell(const FrontendProto *r)
 {
     if (r->bell)

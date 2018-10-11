@@ -282,6 +282,7 @@ static void palette_random_generate(void)
     palette_randomise(palette);
     current_cc = colour_regression_ccm(palette);
     frontend_set_colour_correction(&renderer, &current_cc);
+    frontend_invalidate(&renderer);
     update_back_pixel();
     term_dirty(term);
     flags |= FLAG_DRAWING;
@@ -292,6 +293,7 @@ static void palette_flip_dark_light(void)
     palette_flip_fg_bg(palette);
     current_cc = colour_regression_ccm(palette);
     frontend_set_colour_correction(&renderer, &current_cc);
+    frontend_invalidate(&renderer);
     update_back_pixel();
     term_dirty(term);
     flags |= FLAG_DRAWING;
@@ -683,6 +685,8 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		    break;
 		flags &= ~FLAG_CTRL_S_PREFIX;
 		memset(&ctrl_s_time, 0, sizeof(ctrl_s_time));
+		if (ksym == XK_Escape)
+		    break;
 		if (ksym == '+' || ksym == '=') {
 		    zoom(0.1);
 		    break;
@@ -692,7 +696,6 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		    break;
 		}
 		if (!(kp->state & (XCB_KEY_BUT_MASK_SHIFT |
-				   XCB_KEY_BUT_MASK_CONTROL |
 				   XCB_KEY_BUT_MASK_MOD_1 |
 				   XCB_KEY_BUT_MASK_MOD_4 |
 				   XCB_KEY_BUT_MASK_MOD_5))) {
@@ -705,7 +708,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 			break;
 		    }
 		}
-		if (ksym == 0x0073) {
+		if (ksym == XK_s) {
 		    clock_gettime(CLOCK_MONOTONIC, &ctrl_s_time);
 		    pty_write(pty, "\x13", 1);
 		    break;
@@ -724,7 +727,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
 		break;
 	    }
 
-	    if ((kp->state & XCB_KEY_BUT_MASK_CONTROL) && ksym == 0x0073) {
+	    if ((kp->state & XCB_KEY_BUT_MASK_CONTROL) && ksym == XK_s) {
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		double elapsed = TIMEDIFF_MS(now, ctrl_s_time);
@@ -1416,7 +1419,7 @@ int main(int argc, char *argv[])
 	    double selapsed = TIMEDIFF_MS(now, ctrl_s_time);
 	    if (selapsed >= CTRL_S_TIMEOUT_MS) {
 		flags &= ~FLAG_CTRL_S_PREFIX;
-		pty_write(pty, "\x13", 1);
+		memset(&ctrl_s_time, 0, sizeof(ctrl_s_time));
 	    }
 	}
 

@@ -47,6 +47,7 @@ typedef struct FrontendProto {
     void (*set_font_scale)(void *ctx, double scale);
     void (*set_cursor_alpha)(void *ctx, double alpha);
     void (*damage)(void *ctx);
+    void (*invalidate)(void *ctx);
     Overlay *(*overlay_push)(void *ctx, int x, int y, int w, int h);
     void (*overlay_pop)(void *ctx);
     void (*overlay_set_shadow)(Overlay * o, const ShadowParams * sp);
@@ -74,6 +75,7 @@ void frontend_set_colour_correction(const FrontendProto * r,
 void frontend_set_font_scale(const FrontendProto * r, double scale);
 void frontend_set_cursor_alpha(const FrontendProto * r, double alpha);
 void frontend_damage(const FrontendProto * r);
+void frontend_invalidate(const FrontendProto * r);
 void frontend_bell(const FrontendProto * r);
 void frontend_focus(const FrontendProto * r, int focused);
 void frontend_flush(const FrontendProto * r);

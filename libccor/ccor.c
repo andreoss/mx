@@ -505,6 +505,8 @@ Argb colour_correct(const ColourCorrection *cc, Argb c)
 	((uint32_t) (g + 0.5f) << 8) | ((uint32_t) (b + 0.5f));
 }
 
+#define INK_FLOOR_LUMA 0.0103f
+
 Argb colour_min_contrast(Argb fg, Argb bg, float min_ratio)
 {
     float lfg = colour_luma(fg);
@@ -515,10 +517,15 @@ Argb colour_min_contrast(Argb fg, Argb bg, float min_ratio)
     if ((hi + 0.05f) / (lo + 0.05f) >= min_ratio)
 	return fg;
 
-    int lighten = lbg < 0.5f;
+    float to_white = (1.0f + 0.05f) / (lbg + 0.05f);
+    float to_black = (lbg + 0.05f) / 0.05f;
+    int lighten = to_white > to_black;
+
     float target = lighten
 	? min_ratio * (lbg + 0.05f) - 0.05f
 	: (lbg + 0.05f) / min_ratio - 0.05f;
+    if (!lighten && target <= 0.0f)
+	target = INK_FLOOR_LUMA;
     target = fminf(1.0f, fmaxf(0.0f, target));
 
     float lr = srgb_u8((fg >> 16) & COLOUR_CHANNEL_MASK);
@@ -536,6 +543,14 @@ Argb colour_min_contrast(Argb fg, Argb bg, float min_ratio)
 	    lr += t * (1.0f - lr);
 	    lg += t * (1.0f - lg);
 	    lb += t * (1.0f - lb);
+	}
+    } else {
+	float got = luma(lr, lg, lb);
+	if (got > target && got > 0.0f) {
+	    float t = (got - target) / got;
+	    lr -= t * lr;
+	    lg -= t * lg;
+	    lb -= t * lb;
 	}
     }
     return ((uint32_t) (linear_to_srgb(lr) + 0.5f) << 16) |

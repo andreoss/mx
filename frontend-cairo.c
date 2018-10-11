@@ -189,6 +189,7 @@ enum {
     CAIRO_FORCE_FULL = 1 << 6,
     CAIRO_WINDOW_DAMAGED = 1 << 7,
     CAIRO_CC_CACHE_VALID = 1 << 8,
+    CAIRO_BG_VALID = 1 << 9,
 };
 
 
@@ -494,6 +495,7 @@ static void cairo_set_cc(void *ctx, const ColourCorrection * cc);
 static void cairo_set_font_scale(void *ctx, double scale);
 static void cairo_set_cursor_alpha(void *ctx, double alpha);
 static void cairo_damage(void *ctx);
+static void cairo_invalidate(void *ctx);
 static Overlay *cairo_overlay_push(void *ctx, int x, int y, int w, int h);
 static void cairo_overlay_pop(void *ctx);
 static void cairo_overlay_shadow(Overlay * o, const ShadowParams * sp);
@@ -521,6 +523,7 @@ static const FrontendProto cairo_proto = {
     .set_font_scale = cairo_set_font_scale,
     .set_cursor_alpha = cairo_set_cursor_alpha,
     .damage = cairo_damage,
+    .invalidate = cairo_invalidate,
     .overlay_push = cairo_overlay_push,
     .overlay_pop = cairo_overlay_pop,
     .overlay_set_shadow = cairo_overlay_shadow,
@@ -704,7 +707,9 @@ static void cairo_resize(void *ctx, int cols, int rows)
     b->prev_cur_y = 0;
     b->prev_cur_w = 0;
     b->prev_cur_h = 0;
+    b->bg_grad_top = 0;
     b->flags |= CAIRO_FORCE_FULL;
+    b->flags &= ~CAIRO_BG_VALID;
 }
 
 static void cairo_resize_window(void *ctx, int winw, int winh)
@@ -714,6 +719,7 @@ static void cairo_resize_window(void *ctx, int winw, int winh)
     b->win_height = winh;
     cairo_xcb_surface_set_size(b->output, winw, winh);
     b->bg_grad_top = 0;
+    b->flags &= ~CAIRO_BG_VALID;
 }
 
 static int cairo_char_width(void *ctx)
@@ -763,6 +769,33 @@ static void cairo_set_cc(void *ctx, const ColourCorrection *cc)
 static void cairo_damage(void *ctx)
 {
     ((CairoBackend *) ctx)->flags |= CAIRO_WINDOW_DAMAGED;
+}
+
+static void cairo_invalidate(void *ctx)
+{
+    CairoBackend *b = ctx;
+
+    b->flags |= CAIRO_FORCE_FULL;
+    b->flags &= ~(CAIRO_CC_CACHE_VALID | CAIRO_BG_VALID);
+    b->bg_grad_top = 0;
+    b->border_gen = 0;
+
+    if (b->grad_cache) {
+	cairo_pattern_destroy(b->grad_cache);
+	b->grad_cache = NULL;
+    }
+    if (b->dim_left) {
+	cairo_pattern_destroy(b->dim_left);
+	b->dim_left = NULL;
+    }
+    if (b->dim_right) {
+	cairo_pattern_destroy(b->dim_right);
+	b->dim_right = NULL;
+    }
+
+    if (b->drawn && b->cols > 0 && b->rows > 0)
+	for (int i = 0; i < b->cols * b->rows; i++)
+	    b->drawn[i].r = (Rune) - 1;
 }
 
 static void cairo_set_cursor_alpha(void *ctx, double alpha)
@@ -1001,13 +1034,12 @@ cairo_frame(void *ctx, const Screen *s,
     Argb bg;
     int bg_switched = 0;
     resolve_palette(b, PAL_DEFAULT_BG, &bg);
-    if (bg != b->bg_grad_top) {
-	if (b->backcr) {
-	    set_source_argb(b->backcr, bg);
-	    cairo_paint(b->backcr);
-	    bg_switched = 1;
-	}
+    if (!(b->flags & CAIRO_BG_VALID) || bg != b->bg_grad_top) {
+	set_source_argb(draw, bg);
+	cairo_paint(draw);
+	bg_switched = 1;
 	b->bg_grad_top = bg;
+	b->flags |= CAIRO_BG_VALID;
     }
 
     int dx1 = 0, dy1 = 0, dx2 = cols - 1, dy2 = rows - 1;

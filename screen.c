@@ -314,6 +314,36 @@ void screen_delete_lines(Screen *s, int y, int top, int bot, size_t n)
     screen_scroll_up(s, y, bot, n);
 }
 
+void screen_shift_up(Screen *s, size_t n)
+{
+    if (n == 0 || s->rows == 0)
+	return;
+    if (n > s->rows)
+	n = s->rows;
+
+    s->border_gen++;
+
+    for (size_t i = 0; i + n < s->rows; i++) {
+	Line tmp = s->line[i];
+	s->line[i] = s->line[i + n];
+	s->line[i + n] = tmp;
+	tmp = s->alt[i];
+	s->alt[i] = s->alt[i + n];
+	s->alt[i + n] = tmp;
+	size_t used = s->used[i];
+	s->used[i] = s->used[i + n];
+	s->used[i + n] = used;
+    }
+
+    for (size_t i = s->rows - n; i < s->rows; i++) {
+	fill_cells(s, s->line[i], 0, s->cols);
+	fill_cells(s, s->alt[i], 0, s->cols);
+	s->used[i] = 0;
+    }
+
+    screen_dirty_all(s);
+}
+
 void screen_resize(Screen *s, size_t cols, size_t rows)
 {
     Line *new_line, *new_alt;
@@ -338,6 +368,10 @@ void screen_resize(Screen *s, size_t cols, size_t rows)
 
     for (size_t i = 0; i < minrow; i++) {
 	new_used[i] = MIN(s->used[i], cols);
+	for (size_t j = mincol; j < s->cols; j++) {
+	    s->blink_count -= cell_has_blink(s->line[i][j]);
+	    s->blink_count -= cell_has_blink(s->alt[i][j]);
+	}
 	Cell *tmp;
 	tmp = realloc(s->line[i], cols * sizeof(Cell));
 	new_line[i] = tmp ? tmp : s->line[i];

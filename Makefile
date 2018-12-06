@@ -48,13 +48,20 @@ $(TEST_DIR)/test-region: $(TEST_DIR)/test-region.c region.o screen.o \
 	  region.h screen.h types.h $(CCOR_H)
 	$(CC) -std=c99 $(FEATURE) -I. -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -o $@ $(TEST_DIR)/test-region.c region.o screen.o $(LDFLAGS) -lm
 
-test: test-mock test-region test-colour-correct
+$(TEST_DIR)/test-resize: $(TOBJS) $(TEST_DIR)/test-resize.c libccor/libccor.a \
+	  parser.h screen.h term.h types.h $(CCOR_H)
+	$(CC) $(CFLAGS) -I. -o $@ $(TEST_DIR)/test-resize.c $(TOBJS) libccor/libccor.a $(LDFLAGS) -lm
+
+test: test-mock test-region test-resize test-colour-correct
 
 test-mock: all $(TEST_DIR)/mx-test
 	@MOCK_TERM=./$(TEST_DIR)/mx-test perl $(TEST_DIR)/prove.pl
 
 test-region: all $(TEST_DIR)/mx-test $(TEST_DIR)/test-region
 	@./$(TEST_DIR)/test-region
+
+test-resize: all $(TEST_DIR)/test-resize
+	@./$(TEST_DIR)/test-resize
 
 test-colour-correct: libccor/libccor.a
 	@cd libccor && $(MAKE) test
@@ -66,7 +73,7 @@ mx: $(BINDIR)/mx
 
 clean:
 	rm -rf $(BINDIR) *.o t/mx-test \
-	  t/test-region
+	  t/test-region t/test-resize
 	cd libccor && $(MAKE) clean 2>/dev/null || true
 
 dist: clean

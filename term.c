@@ -106,6 +106,11 @@ void term_process_batch(Term *t, const Event *ev, int nev)
 void term_resize(Term *t, int cols, int rows)
 {
     int old_ntabstops = t->ntabstops;
+    int shift = t->cy - rows + 1;
+    if (cols > 0 && rows > 0 && shift > 0) {
+	screen_shift_up(t->screen, (size_t) shift);
+	t->cy -= shift;
+    }
     screen_resize(t->screen, cols, rows);
     t->ntabstops = cols;
     if (cols > old_ntabstops) {

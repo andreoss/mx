@@ -55,6 +55,7 @@ void screen_free(Screen *s);
 
 
 void screen_resize(Screen *s, size_t cols, size_t rows);
+void screen_shift_up(Screen *s, size_t n);
 
 
 void screen_clear(Screen *s);

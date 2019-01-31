@@ -52,7 +52,11 @@ $(TEST_DIR)/test-resize: $(TOBJS) $(TEST_DIR)/test-resize.c libccor/libccor.a \
 	  parser.h screen.h term.h types.h $(CCOR_H)
 	$(CC) $(CFLAGS) -I. -o $@ $(TEST_DIR)/test-resize.c $(TOBJS) libccor/libccor.a $(LDFLAGS) -lm
 
-test: test-mock test-region test-resize test-colour-correct
+$(TEST_DIR)/test-screen: $(TOBJS) $(TEST_DIR)/test-screen.c libccor/libccor.a \
+	  parser.h screen.h term.h types.h $(CCOR_H)
+	$(CC) $(CFLAGS) -I. -o $@ $(TEST_DIR)/test-screen.c $(TOBJS) libccor/libccor.a $(LDFLAGS) -lm
+
+test: test-mock test-region test-resize test-screen test-colour-correct
 
 test-mock: all $(TEST_DIR)/mx-test
 	@MOCK_TERM=./$(TEST_DIR)/mx-test perl $(TEST_DIR)/prove.pl
@@ -62,6 +66,9 @@ test-region: all $(TEST_DIR)/mx-test $(TEST_DIR)/test-region
 
 test-resize: all $(TEST_DIR)/test-resize
 	@./$(TEST_DIR)/test-resize
+
+test-screen: all $(TEST_DIR)/test-screen
+	@./$(TEST_DIR)/test-screen
 
 test-colour-correct: libccor/libccor.a
 	@cd libccor && $(MAKE) test
@@ -73,7 +80,7 @@ mx: $(BINDIR)/mx
 
 clean:
 	rm -rf $(BINDIR) *.o t/mx-test \
-	  t/test-region t/test-resize
+	  t/test-region t/test-resize t/test-screen
 	cd libccor && $(MAKE) clean 2>/dev/null || true
 
 dist: clean

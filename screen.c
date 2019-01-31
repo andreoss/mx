@@ -163,9 +163,19 @@ screen_clear_region(Screen *s, int x1, int y1, int x2, int y2, Cell filler)
     LIMIT(x2, 0, s->cols - 1);
     LIMIT(y2, 0, s->rows - 1);
 
-    for (int y = y1; y <= y2; y++)
-	for (int x = x1; x <= x2; x++)
-	    curbuf(s)[y][x] = filler;
+    int now = cell_has_blink(filler);
+    for (int y = y1; y <= y2; y++) {
+	Line buf = curbuf(s)[y];
+	if (s->blink_count || now) {
+	    for (int x = x1; x <= x2; x++) {
+		s->blink_count += now - cell_has_blink(buf[x]);
+		buf[x] = filler;
+	    }
+	} else {
+	    for (int x = x1; x <= x2; x++)
+		buf[x] = filler;
+	}
+    }
     screen_dirty(s, x1, y1, x2, y2);
 }
 

@@ -1828,7 +1828,8 @@ cairo_frame(void *ctx, const Screen *s,
 	double w = b->win_width, h = b->win_height;
 	double bw = w * 0.15;
 
-	if (w != b->dim_cache_w || bell_c != b->dim_cache_bell
+	if (!b->dim_left || !b->dim_right
+	    || w != b->dim_cache_w || bell_c != b->dim_cache_bell
 	    || fa != b->dim_cache_alpha) {
 	    float r = (float) ((bell_c >> 16) & COLOUR_CHANNEL_MASK) / COLOUR_CHANNEL_MAX_F;
 	    float g = (float) ((bell_c >> 8) & COLOUR_CHANNEL_MASK) / COLOUR_CHANNEL_MAX_F;

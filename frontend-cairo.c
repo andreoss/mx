@@ -20,6 +20,8 @@
 #define FLASH_MIN      0.01
 #define GLOW_LAYERS    3
 #define OUTLINE_DIRS   8
+#define OUTLINE_SHIFT  0.35f
+#define OUTLINE_MIN_HEIGHT (BASE_CHAR_HEIGHT * 1.5)
 #define GLYPH_DIRECT      256
 #define GLYPH_CACHE_SIZE  2048
 #define GLYPH_CACHE_PROBE 4
@@ -892,6 +894,30 @@ static unsigned int glyph_index_for(FontResources *res, Rune r)
     return FT_Get_Char_Index(res->face, r);
 }
 
+static Argb outline_colour(Argb bg)
+{
+    int r = (bg >> 16) & 0xFF;
+    int g = (bg >> 8) & 0xFF;
+    int b = bg & 0xFF;
+
+    if (colour_luma(bg) < 0.5f) {
+	r = r + (int) ((255 - r) * OUTLINE_SHIFT);
+	g = g + (int) ((255 - g) * OUTLINE_SHIFT);
+	b = b + (int) ((255 - b) * OUTLINE_SHIFT);
+    } else {
+	r = (int) (r * (1.0f - OUTLINE_SHIFT));
+	g = (int) (g * (1.0f - OUTLINE_SHIFT));
+	b = (int) (b * (1.0f - OUTLINE_SHIFT));
+    }
+    return ((Argb) r << 16) | ((Argb) g << 8) | (Argb) b;
+}
+
+static int
+outline_wanted(const CairoBackend *b)
+{
+    return cell_height(b) >= OUTLINE_MIN_HEIGHT;
+}
+
 static void
 draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	     const char *text, const uint16_t *byte_cell, int text_len,
@@ -917,7 +943,10 @@ draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	}
     }
 
-    int glyph_needed = (b->flags & CAIRO_FONT_OUTLINE) ? (int) count * 9 : (int) count;
+    int odirs = (b->flags & CAIRO_FONT_OUTLINE) && outline_wanted(b) ?
+	OUTLINE_DIRS : 0;
+
+    int glyph_needed = (int) count * (1 + odirs);
 
     if (glyph_needed > res->glyph_cap) {
 	int newcap = res->glyph_cap ? res->glyph_cap * 2 : 256;
@@ -947,14 +976,13 @@ draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	}
     }
 
-    if (b->flags & CAIRO_FONT_OUTLINE) {
+    if (odirs) {
 	static const double off_x[OUTLINE_DIRS] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 	static const double off_y[OUTLINE_DIRS] = { -1, -1, -1, 0, 0, 1, 1, 1 };
-	Argb oc = colour_luma(bg) < 0.5f ? COLOUR_MASK : 0x000000u;
-	oc = colour_correct(&b->colour_cc, oc);
+	Argb oc = outline_colour(bg);
 	double or, og, ob;
 	argb_to_rgb(oc, &or, &og, &ob);
-	for (int k = 0; k < OUTLINE_DIRS; k++) {
+	for (int k = 0; k < odirs; k++) {
 	    int base = (int) count + k * (int) count;
 	    double dx = off_x[k];
 	    double dy = off_y[k];
@@ -966,7 +994,7 @@ draw_span(CairoBackend *b, cairo_t *cr, int px, int py,
 	}
 	cairo_save(cr);
 	cairo_set_source_rgba(cr, or, og, ob, b->font_outline_alpha);
-	cairo_show_glyphs(cr, res->glyph_buf + count, count * 8);
+	cairo_show_glyphs(cr, res->glyph_buf + count, count * odirs);
 	cairo_restore(cr);
     }
 

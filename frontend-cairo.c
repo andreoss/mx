@@ -646,9 +646,10 @@ static void cairo_resize(void *ctx, int cols, int rows)
     cairo_surface_t *old_backbuf = b->backbuf;
     cairo_t *old_backcr = b->backcr;
 
-    b->backbuf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-					    b->expected_width,
-					    b->expected_height);
+    b->backbuf = cairo_surface_create_similar(b->output,
+					      CAIRO_CONTENT_COLOR,
+					      b->expected_width,
+					      b->expected_height);
     if (cairo_surface_status(b->backbuf) != CAIRO_STATUS_SUCCESS) {
 	cairo_surface_destroy(b->backbuf);
 	b->backbuf = NULL;

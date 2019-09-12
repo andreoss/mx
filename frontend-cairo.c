@@ -1618,18 +1618,32 @@ cairo_frame(void *ctx, const Screen *s,
 	cur_px = bp + cx * cw - cm;
 	cur_py = bp + cy * ch - cm;
     }
-    int partial = fx2 < 0 && !sel_changed && !bg_switched && !scaled
+    int partial = !sel_changed && !bg_switched && !scaled
 	&& !(b->flags & CAIRO_FOCUS_DIM) && b->flash_alpha == 0 && b->backbuf != NULL
 	&& !(b->flags & CAIRO_WINDOW_DAMAGED);
     b->flags &= ~CAIRO_WINDOW_DAMAGED;
     if (partial) {
 	int x1 = 0, y1 = 0, x2 = 0, y2 = 0, have = 0;
-	if (cur_px >= 0) {
-	    x1 = cur_px;
-	    y1 = cur_py;
-	    x2 = cur_px + cw + 2 * cm;
-	    y2 = cur_py + ch + 2 * cm;
+	if (fx2 >= 0) {
+	    x1 = bp + fx1 * cw - cw;
+	    y1 = bp + fy1 * ch - ch;
+	    x2 = bp + (fx2 + 1) * cw + cw;
+	    y2 = bp + (fy2 + 1) * ch + ch;
 	    have = 1;
+	}
+	if (cur_px >= 0) {
+	    if (!have) {
+		x1 = cur_px;
+		y1 = cur_py;
+		x2 = cur_px + cw + 2 * cm;
+		y2 = cur_py + ch + 2 * cm;
+		have = 1;
+	    } else {
+		x1 = MIN(x1, cur_px);
+		y1 = MIN(y1, cur_py);
+		x2 = MAX(x2, cur_px + cw + 2 * cm);
+		y2 = MAX(y2, cur_py + ch + 2 * cm);
+	    }
 	}
 	if (b->prev_cur_w > 0) {
 	    if (!have) {

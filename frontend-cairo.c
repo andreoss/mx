@@ -1261,6 +1261,8 @@ cairo_frame(void *ctx, const Screen *s,
     if (fx2 >= 0 && nregions > 0)
 	for (int i = 0; i < nregions; i++) {
 	    Region *r = &regions[i];
+	    if (!is_valid_box(s, r, cols, rows))
+		continue;
 	    if (r->bounds.x1 <= fx1 || r->bounds.x0 > fx2 || r->bounds.y1 <= fy1 || r->bounds.y0 > fy2)
 		continue;
 	    for (int ry = r->bounds.y0; ry < r->bounds.y1; ry++) {

@@ -110,6 +110,7 @@ enum {
     FLAG_BLINK_HAS_SLOW = 1 << 6,
     FLAG_WIN_FOCUSED = 1 << 7,
     FLAG_CONF_PENDING = 1 << 8,
+    FLAG_URGENT = 1 << 9,
 };
 static unsigned flags = FLAG_ON_RESIZE_RESIZE | FLAG_WIN_FOCUSED;
 
@@ -653,6 +654,7 @@ static void handle_xcb_event(xcb_generic_event_t *ge)
     case XCB_EXPOSE:
 	frontend_damage(&renderer);
 	term_dirty(term);
+	flags |= FLAG_URGENT;
 	break;
 
     case XCB_KEY_PRESS:
@@ -1279,7 +1281,9 @@ int main(int argc, char *argv[])
 	}
 	apply_configure();
 
-	if (flags & FLAG_DRAWING) {
+	if (flags & FLAG_URGENT) {
+	    timeout_ms = 0;
+	} else if (flags & FLAG_DRAWING) {
 	    double elapsed = TIMEDIFF_MS(now, draw_trigger);
 	    timeout_ms = (int) (maxlatency_val - elapsed);
 	    if (timeout_ms < 0)
@@ -1429,14 +1433,15 @@ int main(int argc, char *argv[])
 	clock_gettime(CLOCK_MONOTONIC, &pt1);
 
 	double elapsed = TIMEDIFF_MS(pt1, draw_trigger);
-	if (elapsed < minlatency_val && !input_sel_dragging(input)) {
+	if (!(flags & FLAG_URGENT) && elapsed < minlatency_val
+	    && !input_sel_dragging(input)) {
 	    int remain = (int) (minlatency_val - elapsed);
 	    if (remain > 0)
 		usleep((useconds_t) remain * 1000);
 	    continue;
 	}
 
-	if (last_frame_time.tv_sec) {
+	if (!(flags & FLAG_URGENT) && last_frame_time.tv_sec) {
 	    double since_frame = TIMEDIFF_MS(pt1, last_frame_time);
 	    if (since_frame < FRAME_TIME_MS && !input_sel_dragging(input))
 		continue;
@@ -1459,7 +1464,7 @@ int main(int argc, char *argv[])
 	xcb_flush(conn);
 	clock_gettime(CLOCK_MONOTONIC, &last_frame_time);
 
-	flags &= ~FLAG_DRAWING;
+	flags &= ~(FLAG_DRAWING | FLAG_URGENT);
     }
 
 

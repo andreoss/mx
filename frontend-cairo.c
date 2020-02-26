@@ -110,6 +110,7 @@ struct CairoBackend {
     int noverlays, overlay_cap;
     Argb bg_grad_top;
     int border_gen;
+    unsigned border_sig;
     uint8_t *border_visited;
     Region *border_cache;
     int border_cache_n;
@@ -192,6 +193,7 @@ enum {
     CAIRO_WINDOW_DAMAGED = 1 << 7,
     CAIRO_CC_CACHE_VALID = 1 << 8,
     CAIRO_BG_VALID = 1 << 9,
+    CAIRO_BORDERS_MOVED = 1 << 10,
 };
 
 
@@ -1188,6 +1190,31 @@ cairo_frame(void *ctx, const Screen *s,
 	border_cache_refresh(b, s);
 	regions = b->border_cache;
 	nregions = b->border_cache_n;
+	unsigned sig = 2166136261u;
+	for (int i = 0; i < nregions; i++) {
+	    Region *r = &regions[i];
+	    unsigned v[6] = {
+		(unsigned) r->bounds.x0, (unsigned) r->bounds.y0,
+		(unsigned) r->bounds.x1, (unsigned) r->bounds.y1,
+		(unsigned) r->bg,
+		(unsigned) is_valid_box(s, r, cols, rows)
+	    };
+	    for (int k = 0; k < 6; k++) {
+		sig ^= v[k];
+		sig *= 16777619u;
+	    }
+	}
+	if (sig != b->border_sig) {
+	    b->border_sig = sig;
+	    b->flags |= CAIRO_BORDERS_MOVED;
+	    if (b->drawn)
+		for (int i = 0; i < cols * rows; i++)
+		    b->drawn[i].r = (Rune) - 1;
+	    dx1 = 0;
+	    dy1 = 0;
+	    dx2 = cols - 1;
+	    dy2 = rows - 1;
+	}
     }
 
     int fx1 = cols, fy1 = rows, fx2 = -1, fy2 = -1;
@@ -1622,8 +1649,9 @@ cairo_frame(void *ctx, const Screen *s,
     }
     int partial = !sel_changed && !bg_switched && !scaled
 	&& !(b->flags & CAIRO_FOCUS_DIM) && b->flash_alpha == 0 && b->backbuf != NULL
-	&& !(b->flags & CAIRO_WINDOW_DAMAGED);
-    b->flags &= ~CAIRO_WINDOW_DAMAGED;
+	&& !(b->flags & CAIRO_WINDOW_DAMAGED)
+	&& !(b->flags & CAIRO_BORDERS_MOVED);
+    b->flags &= ~(CAIRO_WINDOW_DAMAGED | CAIRO_BORDERS_MOVED);
     if (partial) {
 	int x1 = 0, y1 = 0, x2 = 0, y2 = 0, have = 0;
 	if (fx2 >= 0) {

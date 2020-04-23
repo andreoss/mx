@@ -1218,23 +1218,23 @@ cairo_frame(void *ctx, const Screen *s,
     }
 
     int fx1 = cols, fy1 = rows, fx2 = -1, fy2 = -1;
-    if (has_dirty)
+    if (has_dirty) {
+	if (dy1 > 0)
+	    dy1--;
+	if (dy2 < rows - 1)
+	    dy2++;
+
 	for (y = dy1; y <= dy2; y++) {
 	    uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
 	    memset(flags, 0, (size_t) cols);
-	    int any = 0;
 	    for (x = 0; x < cols; x++) {
 		Cell c = screen_get(s, x, y);
 		Cell old = drow[x];
 		drow[x] = c;
-		if (!use_diff || ATTRCMP(c, old) || c.r != old.r) {
+		if (!use_diff || ATTRCMP(c, old) || c.r != old.r)
 		    flags[x] = 1;
-		    any = 1;
-		}
 	    }
-	    if (!any)
-		continue;
 
 	    x = 0;
 	    while (x < cols) {
@@ -1271,7 +1271,23 @@ cairo_frame(void *ctx, const Screen *s,
 			flags[i] = 1;
 		x = x2;
 	    }
+	}
 
+	for (y = dy2 - 1; y >= dy1; y--) {
+	    uint8_t *cur = b->repaint + (size_t) y * cols;
+	    for (x = 0; x < cols; x++)
+		if (cur[x])
+		    cur[cols + x] = 1;
+	}
+	for (y = dy1 + 1; y <= dy2; y++) {
+	    uint8_t *cur = b->repaint + (size_t) y * cols;
+	    for (x = 0; x < cols; x++)
+		if (cur[x])
+		    cur[x - cols] = 1;
+	}
+
+	for (y = dy1; y <= dy2; y++) {
+	    uint8_t *flags = b->repaint + (size_t) y * cols;
 	    for (x = 0; x < cols; x++)
 		if (flags[x]) {
 		    if (x < fx1)
@@ -1284,6 +1300,7 @@ cairo_frame(void *ctx, const Screen *s,
 			fy2 = y;
 		}
 	}
+    }
 
     if (fx2 >= 0 && nregions > 0)
 	for (int i = 0; i < nregions; i++) {

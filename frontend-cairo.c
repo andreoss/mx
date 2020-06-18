@@ -1235,42 +1235,12 @@ cairo_frame(void *ctx, const Screen *s,
 		if (!use_diff || ATTRCMP(c, old) || c.r != old.r)
 		    flags[x] = 1;
 	    }
-
-	    x = 0;
-	    while (x < cols) {
-		Cell first = drow[x];
-		if (first.r == 0 || (first.attr & ATTR_WDUMMY)) {
-		    x++;
-		    continue;
-		}
-		int x2 = x + 1;
-		while (x2 < cols) {
-		    Cell next = drow[x2];
-		    if (next.r == 0)
-			break;
-		    if (next.attr & ATTR_WDUMMY) {
-			x2++;
-			continue;
-		    }
-		    if (next.attr != first.attr || next.fg != first.fg
-			|| next.bg != first.bg || next.ul != first.ul)
-			break;
-		    if (sel_check
-			(x2, y, sel_active, sel_start_x, sel_start_y,
-			 sel_end_x, sel_end_y)
-			!= sel_check(x, y, sel_active, sel_start_x,
-				     sel_start_y, sel_end_x, sel_end_y))
-			break;
-		    x2++;
-		}
-		int run_changed = 0;
-		for (int i = x; i < x2 && !run_changed; i++)
-		    run_changed = flags[i];
-		if (run_changed)
-		    for (int i = x; i < x2; i++)
-			flags[i] = 1;
-		x = x2;
-	    }
+	    for (x = cols - 2; x >= 0; x--)
+		if (flags[x])
+		    flags[x + 1] = 1;
+	    for (x = 1; x < cols; x++)
+		if (flags[x])
+		    flags[x - 1] = 1;
 	}
 
 	for (y = dy2 - 1; y >= dy1; y--) {
@@ -1509,132 +1479,153 @@ cairo_frame(void *ctx, const Screen *s,
 		    x2++;
 		}
 
-		if (!flags[x]) {
-		    x = x2;
-		    continue;
-		}
-
-		char buf[4096];
-		uint16_t byte_cell[4096];
-		int pos = 0;
-		for (int i = x; i < x2; i++) {
-		    Cell c = drow[i];
-		    if (c.r == 0 || (c.attr & ATTR_WDUMMY))
-			continue;
-		    if (pos + 4 < (int) sizeof(buf)) {
-			int byte_start = pos;
-			if (c.r < 0x80)
-			    buf[pos++] = (char) c.r;
-			else
-			    pos += utf8_encode(c.r, buf + pos);
-			for (int bi = byte_start; bi < pos; bi++)
-			    byte_cell[bi] = (uint16_t) (i - x);
-		    }
-		}
-		buf[pos] = '\0';
-
-		if (pos > 0) {
-		    int px = bp + x * cw;
-		    int py = bp + y * ch;
-		    int span_sel = sel_check(x, y, sel_active, sel_start_x,
-					     sel_start_y, sel_end_x,
-					     sel_end_y);
-
-		    int eff_fg, eff_bg;
-		    cell_effective(first, &eff_fg, &eff_bg);
-		    int bold_idx = eff_fg;
-		    if ((first.attr & ATTR_BOLD) && bold_idx >= 0
-			&& bold_idx < 8)
-			bold_idx += 8;
-		    Argb fg;
-		    resolve_palette(b, bold_idx, &fg);
-
-		    {
-			Argb clamp_bg;
-			resolve_palette(b, eff_bg, &clamp_bg);
-			fg = colour_min_contrast(fg, clamp_bg,
-						 MIN_CONTRAST);
-		    }
-		    if (span_sel)
-			fg = apply_sepia(fg);
-
-		    if ((mode & MODE_BLINK)
-			&& (first.attr &
-			    (ATTR_BLINK_SLOW | ATTR_BLINK_FAST))) {
-			Argb cell_bg;
-			resolve_palette(b, eff_bg, &cell_bg);
-			fg = cell_bg;
-		    }
-
+		int rs = x;
+		while (rs < x2) {
+		    int re;
 		    if (first.attr & ATTR_INVISIBLE) {
-			cairo_save(draw);
-			cairo_set_source_rgba(draw, 0, 0, 0, 1);
-			cairo_set_line_width(draw, 1.0);
-			int span_w = (x2 - x) * cw;
-			cairo_rectangle(draw, px + 0.5, py + 0.5,
-					span_w - 1, ch - 1);
-			cairo_set_dash(draw, (double[]) { 2, 2 }, 2, 0);
-			cairo_stroke(draw);
-			cairo_set_dash(draw, NULL, 0, 0);
-			cairo_restore(draw);
+			int anyf = 0;
+			for (int i = x; i < x2 && !anyf; i++)
+			    anyf = flags[i];
+			if (!anyf)
+			    break;
+			rs = x;
+			re = x2;
 		    } else {
-			double fg_alpha =
-			    attr_faint(first.attr) ? FAINT_ALPHA : 1.0;
+			while (rs < x2 && !flags[rs])
+			    rs++;
+			if (rs >= x2)
+			    break;
+			re = rs;
+			while (re < x2 && flags[re])
+			    re++;
+		    }
+
+		    char buf[4096];
+		    uint16_t byte_cell[4096];
+		    int pos = 0;
+		    for (int i = rs; i < re; i++) {
+			Cell c = drow[i];
+			if (c.r == 0 || (c.attr & ATTR_WDUMMY))
+			    continue;
+			if (pos + 4 < (int) sizeof(buf)) {
+			    int byte_start = pos;
+			    if (c.r < 0x80)
+				buf[pos++] = (char) c.r;
+			    else
+				pos += utf8_encode(c.r, buf + pos);
+			    for (int bi = byte_start; bi < pos; bi++)
+				byte_cell[bi] = (uint16_t) (i - rs);
+			}
+		    }
+		    buf[pos] = '\0';
+
+		    if (pos > 0) {
+			int px = bp + rs * cw;
+			int py = bp + y * ch;
+			int span_sel = sel_check(rs, y, sel_active, sel_start_x,
+						 sel_start_y, sel_end_x,
+						 sel_end_y);
+
+			int eff_fg, eff_bg;
+			cell_effective(first, &eff_fg, &eff_bg);
+			int bold_idx = eff_fg;
+			if ((first.attr & ATTR_BOLD) && bold_idx >= 0
+			    && bold_idx < 8)
+			    bold_idx += 8;
+			Argb fg;
+			resolve_palette(b, bold_idx, &fg);
+
 			{
-			    double c_r, c_g, c_b;
-			    argb_to_rgb(fg, &c_r, &c_g, &c_b);
-			    cairo_set_source_rgba(draw, c_r, c_g, c_b,
-						  fg_alpha);
+			    Argb clamp_bg;
+			    resolve_palette(b, eff_bg, &clamp_bg);
+			    fg = colour_min_contrast(fg, clamp_bg,
+						     MIN_CONTRAST);
+			}
+			if (span_sel)
+			    fg = apply_sepia(fg);
+
+			if ((mode & MODE_BLINK)
+			    && (first.attr &
+				(ATTR_BLINK_SLOW | ATTR_BLINK_FAST))) {
+			    Argb cell_bg;
+			    resolve_palette(b, eff_bg, &cell_bg);
+			    fg = cell_bg;
 			}
 
-			int span_bold = first.attr & ATTR_BOLD;
-			if (span_bold != cur_bold) {
-			    FontResources *fr =
-				span_bold ? &b->bold : &b->normal;
-			    cairo_set_font_face(draw, fr->cairo_face);
-			    cairo_set_font_size(draw,
-						b->font_size *
-						b->font_scale);
-			    cur_bold = span_bold;
-			}
-
-			{
-			    Argb span_bg;
-			    resolve_palette(b, eff_bg, &span_bg);
-			    draw_span(b, draw, px, py, buf, byte_cell,
-					 pos, first.attr & ATTR_BOLD,
-					 span_bg);
-			}
-
-			if (first.attr & (ATTR_UNDERLINE | ATTR_STRUCK)) {
-			    double cx0 = px;
-			    double cx1 = px + (x2 - x) * cw;
-			    double ul_y =
-				py +
-				(int) (b->char_ascent * b->font_scale) + 2;
-			    double strike_y = py + ch * 0.5;
-			    cairo_set_line_width(draw, 2.0);
-			    if (first.attr & ATTR_UNDERLINE) {
-				if (first.ul != PAL_DEFAULT_FG) {
-				    Argb ulc;
-				    resolve_palette(b, (int) first.ul, &ulc);
-				    double u_r, u_g, u_b;
-				    argb_to_rgb(ulc, &u_r, &u_g, &u_b);
-				    cairo_set_source_rgba(draw, u_r, u_g, u_b, 1.0);
-				}
-				cairo_new_path(draw);
-				cairo_move_to(draw, cx0, ul_y);
-				cairo_line_to(draw, cx1, ul_y);
-				cairo_stroke(draw);
+			if (first.attr & ATTR_INVISIBLE) {
+			    cairo_save(draw);
+			    cairo_set_source_rgba(draw, 0, 0, 0, 1);
+			    cairo_set_line_width(draw, 1.0);
+			    int span_w = (re - rs) * cw;
+			    cairo_rectangle(draw, px + 0.5, py + 0.5,
+					    span_w - 1, ch - 1);
+			    cairo_set_dash(draw, (double[]) { 2, 2 }, 2, 0);
+			    cairo_stroke(draw);
+			    cairo_set_dash(draw, NULL, 0, 0);
+			    cairo_restore(draw);
+			} else {
+			    double fg_alpha =
+				attr_faint(first.attr) ? FAINT_ALPHA : 1.0;
+			    {
+				double c_r, c_g, c_b;
+				argb_to_rgb(fg, &c_r, &c_g, &c_b);
+				cairo_set_source_rgba(draw, c_r, c_g, c_b,
+						      fg_alpha);
 			    }
-			    if (first.attr & ATTR_STRUCK) {
-				cairo_new_path(draw);
-				cairo_move_to(draw, cx0, strike_y);
-				cairo_line_to(draw, cx1, strike_y);
-				cairo_stroke(draw);
+
+			    int span_bold = first.attr & ATTR_BOLD;
+			    if (span_bold != cur_bold) {
+				FontResources *fr =
+				    span_bold ? &b->bold : &b->normal;
+				cairo_set_font_face(draw, fr->cairo_face);
+				cairo_set_font_size(draw,
+						    b->font_size *
+						    b->font_scale);
+				cur_bold = span_bold;
+			    }
+
+			    {
+				Argb span_bg;
+				resolve_palette(b, eff_bg, &span_bg);
+				draw_span(b, draw, px, py, buf, byte_cell,
+					     pos, first.attr & ATTR_BOLD,
+					     span_bg);
+			    }
+
+			    if (first.attr & (ATTR_UNDERLINE | ATTR_STRUCK)) {
+				double cx0 = px;
+				double cx1 = px + (re - rs) * cw;
+				double ul_y =
+				    py +
+				    (int) (b->char_ascent * b->font_scale) + 2;
+				double strike_y = py + ch * 0.5;
+				cairo_set_line_width(draw, 2.0);
+				if (first.attr & ATTR_UNDERLINE) {
+				    if (first.ul != PAL_DEFAULT_FG) {
+					Argb ulc;
+					resolve_palette(b, (int) first.ul, &ulc);
+					double u_r, u_g, u_b;
+					argb_to_rgb(ulc, &u_r, &u_g, &u_b);
+					cairo_set_source_rgba(draw, u_r, u_g, u_b, 1.0);
+				    }
+				    cairo_new_path(draw);
+				    cairo_move_to(draw, cx0, ul_y);
+				    cairo_line_to(draw, cx1, ul_y);
+				    cairo_stroke(draw);
+				}
+				if (first.attr & ATTR_STRUCK) {
+				    cairo_new_path(draw);
+				    cairo_move_to(draw, cx0, strike_y);
+				    cairo_line_to(draw, cx1, strike_y);
+				    cairo_stroke(draw);
+				}
 			    }
 			}
 		    }
+
+		    if (first.attr & ATTR_INVISIBLE)
+			break;
+		    rs = re;
 		}
 
 		x = x2;

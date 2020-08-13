@@ -1223,42 +1223,44 @@ cairo_frame(void *ctx, const Screen *s,
 	    dy1--;
 	if (dy2 < rows - 1)
 	    dy2++;
+	int cx1 = dx1 > 0 ? dx1 - 1 : 0;
+	int cx2 = dx2 < cols - 1 ? dx2 + 1 : cols - 1;
 
 	for (y = dy1; y <= dy2; y++) {
 	    uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
 	    memset(flags, 0, (size_t) cols);
-	    for (x = 0; x < cols; x++) {
+	    for (x = dx1; x <= dx2; x++) {
 		Cell c = screen_get(s, x, y);
 		Cell old = drow[x];
 		drow[x] = c;
 		if (!use_diff || ATTRCMP(c, old) || c.r != old.r)
 		    flags[x] = 1;
 	    }
-	    for (x = cols - 2; x >= 0; x--)
+	    for (x = cx2 - 1; x >= cx1; x--)
 		if (flags[x])
 		    flags[x + 1] = 1;
-	    for (x = 1; x < cols; x++)
+	    for (x = cx1 + 1; x <= cx2; x++)
 		if (flags[x])
 		    flags[x - 1] = 1;
 	}
 
 	for (y = dy2 - 1; y >= dy1; y--) {
 	    uint8_t *cur = b->repaint + (size_t) y * cols;
-	    for (x = 0; x < cols; x++)
+	    for (x = cx1; x <= cx2; x++)
 		if (cur[x])
 		    cur[cols + x] = 1;
 	}
 	for (y = dy1 + 1; y <= dy2; y++) {
 	    uint8_t *cur = b->repaint + (size_t) y * cols;
-	    for (x = 0; x < cols; x++)
+	    for (x = cx1; x <= cx2; x++)
 		if (cur[x])
 		    cur[x - cols] = 1;
 	}
 
 	for (y = dy1; y <= dy2; y++) {
 	    uint8_t *flags = b->repaint + (size_t) y * cols;
-	    for (x = 0; x < cols; x++)
+	    for (x = cx1; x <= cx2; x++)
 		if (flags[x]) {
 		    if (x < fx1)
 			fx1 = x;
@@ -1303,8 +1305,8 @@ cairo_frame(void *ctx, const Screen *s,
 	for (y = fy1; y <= fy2; y++) {
 	    const uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
-	    x = 0;
-	    while (x < cols) {
+	    x = fx1;
+	    while (x <= fx2) {
 		if (!flags[x]) {
 		    x++;
 		    continue;
@@ -1361,8 +1363,8 @@ cairo_frame(void *ctx, const Screen *s,
 	    cairo_new_path(draw);
 	    for (y = fy1; y <= fy2; y++) {
 		const uint8_t *flags = b->repaint + (size_t) y * cols;
-		x = 0;
-		while (x < cols) {
+		x = fx1;
+		while (x <= fx2) {
 		    if (!flags[x]) {
 			x++;
 			continue;
@@ -1400,8 +1402,12 @@ cairo_frame(void *ctx, const Screen *s,
 	for (y = fy1; y <= fy2; y++) {
 	    const uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
-	    x = 0;
-	    while (x < cols) {
+	    x = fx1;
+	    while (x > 0 && (drow[x].attr & ATTR_GRAPH)
+		   && (drow[x - 1].attr & ATTR_GRAPH)
+		   && drow[x - 1].graph == drow[x].graph)
+		x--;
+	    while (x <= fx2) {
 		if (!(drow[x].attr & ATTR_GRAPH)) {
 		    x++;
 		    continue;
@@ -1450,16 +1456,19 @@ cairo_frame(void *ctx, const Screen *s,
 	for (y = fy1; y <= fy2; y++) {
 	    const uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
-	    x = 0;
-	    while (x < cols) {
+	    x = fx1;
+	    while (x > 0 && (drow[x].attr & ATTR_WDUMMY))
+		x--;
+	    while (x <= fx2) {
 		Cell first = drow[x];
 		if (first.r == 0 || (first.attr & (ATTR_WDUMMY | ATTR_GRAPH))) {
 		    x++;
 		    continue;
 		}
 
+		int lim = (first.attr & ATTR_INVISIBLE) ? cols : fx2 + 1;
 		int x2 = x + 1;
-		while (x2 < cols) {
+		while (x2 < lim) {
 		    Cell next = drow[x2];
 		    if (next.r == 0)
 			break;

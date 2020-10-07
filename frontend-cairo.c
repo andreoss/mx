@@ -1185,7 +1185,7 @@ cairo_frame(void *ctx, const Screen *s,
     LIMIT(dy2, 0, rows - 1);
 
     Region *regions = NULL;
-    int nregions = 0;
+    int nregions = 0, nvalid = 0;
     if (has_dirty && (b->flags & CAIRO_BORDER_BLOCKS)) {
 	border_cache_refresh(b, s);
 	regions = b->border_cache;
@@ -1193,11 +1193,12 @@ cairo_frame(void *ctx, const Screen *s,
 	unsigned sig = 2166136261u;
 	for (int i = 0; i < nregions; i++) {
 	    Region *r = &regions[i];
+	    int ok = is_valid_box(s, r, cols, rows);
+	    nvalid += ok;
 	    unsigned v[6] = {
 		(unsigned) r->bounds.x0, (unsigned) r->bounds.y0,
 		(unsigned) r->bounds.x1, (unsigned) r->bounds.y1,
-		(unsigned) r->bg,
-		(unsigned) is_valid_box(s, r, cols, rows)
+		(unsigned) r->bg, (unsigned) ok
 	    };
 	    for (int k = 0; k < 6; k++) {
 		sig ^= v[k];
@@ -1358,7 +1359,7 @@ cairo_frame(void *ctx, const Screen *s,
 	    }
 	}
 
-	if (nregions > 0) {
+	if (nvalid > 0) {
 	    cairo_save(draw);
 	    cairo_new_path(draw);
 	    for (y = fy1; y <= fy2; y++) {

@@ -111,6 +111,8 @@ struct CairoBackend {
     Argb bg_grad_top;
     int border_gen;
     unsigned border_sig;
+    Rect *border_rects;
+    int border_rects_n, border_rects_cap;
     uint8_t *border_visited;
     Region *border_cache;
     int border_cache_n;
@@ -617,6 +619,7 @@ static void cairo_free(void *ctx)
     free(b->font_string);
     if (b->border_visited)
 	free(b->border_visited);
+    free(b->border_rects);
     free(b->border_cache);
     free(b->drawn);
     free(b->repaint);
@@ -1190,11 +1193,24 @@ cairo_frame(void *ctx, const Screen *s,
 	border_cache_refresh(b, s);
 	regions = b->border_cache;
 	nregions = b->border_cache_n;
+	if (nregions > b->border_rects_cap) {
+	    Rect *tmp = realloc(b->border_rects,
+				2 * (size_t) nregions * sizeof(Rect));
+	    if (tmp) {
+		b->border_rects = tmp;
+		b->border_rects_cap = nregions;
+	    }
+	}
+	Rect *newr = b->border_rects
+	    ? b->border_rects + b->border_rects_cap : NULL;
 	unsigned sig = 2166136261u;
+	int nnew = 0;
 	for (int i = 0; i < nregions; i++) {
 	    Region *r = &regions[i];
 	    int ok = is_valid_box(s, r, cols, rows);
 	    nvalid += ok;
+	    if (ok && newr && nnew < b->border_rects_cap)
+		newr[nnew++] = r->bounds;
 	    unsigned v[6] = {
 		(unsigned) r->bounds.x0, (unsigned) r->bounds.y0,
 		(unsigned) r->bounds.x1, (unsigned) r->bounds.y1,
@@ -1208,14 +1224,50 @@ cairo_frame(void *ctx, const Screen *s,
 	if (sig != b->border_sig) {
 	    b->border_sig = sig;
 	    b->flags |= CAIRO_BORDERS_MOVED;
-	    if (b->drawn)
-		for (int i = 0; i < cols * rows; i++)
-		    b->drawn[i].r = (Rune) - 1;
-	    dx1 = 0;
-	    dy1 = 0;
-	    dx2 = cols - 1;
-	    dy2 = rows - 1;
+	    int ux1 = cols, uy1 = rows, ux2 = -1, uy2 = -1;
+	    for (int i = 0; i < b->border_rects_n + nnew; i++) {
+		Rect *q = i < b->border_rects_n
+		    ? &b->border_rects[i]
+		    : &newr[i - b->border_rects_n];
+		if (q->x0 - 1 < ux1)
+		    ux1 = q->x0 - 1;
+		if (q->y0 - 1 < uy1)
+		    uy1 = q->y0 - 1;
+		if (q->x1 > ux2)
+		    ux2 = q->x1;
+		if (q->y1 > uy2)
+		    uy2 = q->y1;
+	    }
+	    LIMIT(ux1, 0, cols - 1);
+	    LIMIT(uy1, 0, rows - 1);
+	    LIMIT(ux2, 0, cols - 1);
+	    LIMIT(uy2, 0, rows - 1);
+	    if (ux2 >= ux1 && uy2 >= uy1) {
+		if (b->drawn)
+		    for (y = uy1; y <= uy2; y++)
+			for (x = ux1; x <= ux2; x++)
+			    b->drawn[(size_t) y * cols + x].r = (Rune) - 1;
+		if (!has_dirty) {
+		    dx1 = ux1;
+		    dy1 = uy1;
+		    dx2 = ux2;
+		    dy2 = uy2;
+		    has_dirty = 1;
+		} else {
+		    if (ux1 < dx1)
+			dx1 = ux1;
+		    if (uy1 < dy1)
+			dy1 = uy1;
+		    if (ux2 > dx2)
+			dx2 = ux2;
+		    if (uy2 > dy2)
+			dy2 = uy2;
+		}
+	    }
 	}
+	for (int i = 0; i < nnew; i++)
+	    b->border_rects[i] = newr[i];
+	b->border_rects_n = nnew;
     }
 
     int fx1 = cols, fy1 = rows, fx2 = -1, fy2 = -1;
@@ -2149,6 +2201,12 @@ cairo_draw_block_borders(CairoBackend *b, cairo_t *draw, const Screen *s)
 
     for (int i = 0; i < n; i++) {
 	Region *r = &regions[i];
+
+	int xa = bp + r->bounds.x0 * cw;
+	int ya = bp + r->bounds.y0 * ch;
+	int xb = bp + r->bounds.x1 * cw;
+	int yb = bp + r->bounds.y1 * ch;
+
 	if (!is_valid_box(s, r, cols, rows))
 	    continue;
 
@@ -2158,11 +2216,6 @@ cairo_draw_block_borders(CairoBackend *b, cairo_t *draw, const Screen *s)
 	    (((bg_c >> 8) & COLOUR_CHANNEL_MASK) >> 1) << 8 | ((bg_c & COLOUR_CHANNEL_MASK) >> 1);
 	double rc, gc, bc;
 	argb_to_rgb(border_c, &rc, &gc, &bc);
-
-	int xa = bp + r->bounds.x0 * cw;
-	int ya = bp + r->bounds.y0 * ch;
-	int xb = bp + r->bounds.x1 * cw;
-	int yb = bp + r->bounds.y1 * ch;
 
 	glow_edge_h(draw, xa, xb, ya, -1, rc, gc, bc);
 	glow_edge_h(draw, xa, xb, yb, 1, rc, gc, bc);

@@ -47,6 +47,7 @@ typedef struct Screen Screen;
 size_t screen_cols(const Screen *s);
 size_t screen_rows(const Screen *s);
 Cell screen_get(const Screen *s, int x, int y);
+const Cell *screen_row(const Screen *s, int y);
 void screen_set(Screen *s, int x, int y, Cell c);
 
 

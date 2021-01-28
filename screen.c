@@ -28,6 +28,14 @@ Cell screen_get(const Screen *s, int x, int y)
     return buf[y][x];
 }
 
+const Cell *screen_row(const Screen *s, int y)
+{
+    if (y < 0 || (size_t) y >= s->rows)
+	return NULL;
+    const Line *buf = (s->flags & SCREEN_ACTIVE) ? s->alt : s->line;
+    return buf[y];
+}
+
 static void screen_dirty_union(Screen *s, int x1, int y1, int x2, int y2)
 {
     if (!(s->flags & SCREEN_HAS_DIRTY)) {

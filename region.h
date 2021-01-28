@@ -5,10 +5,12 @@
 struct Screen;
 
 typedef Cell(*PlaneAt) (const void *ctx, int x, int y);
+typedef const Cell *(*PlaneRow) (const void *ctx, int y);
 
 typedef struct {
     const void *ctx;
     PlaneAt at;
+    PlaneRow row;
 } Plane;
 
 typedef struct {
@@ -16,6 +18,7 @@ typedef struct {
 } ScreenPlaneCtx;
 
 Cell screen_plane_at(const void *ctx, int x, int y);
+const Cell *screen_plane_row(const void *ctx, int y);
 
 typedef struct {
     int x0, y0, x1, y1;

@@ -10,6 +10,12 @@ Cell screen_plane_at(const void *ctx, int x, int y)
     return screen_get(sp->s, x, y);
 }
 
+const Cell *screen_plane_row(const void *ctx, int y)
+{
+    const ScreenPlaneCtx *sp = ctx;
+    return screen_row(sp->s, y);
+}
+
 Region *region_compute(const Plane *p, int cols, int rows,
 		       int *nout, uint8_t *visited)
 {
@@ -34,8 +40,9 @@ Region *region_compute(const Plane *p, int cols, int rows,
 
     for (int y = 0; y < rows; y++) {
 	size_t row = (size_t) y * cols;
+	const Cell *src = p->row ? p->row(p->ctx, y) : NULL;
 	for (int x = 0; x < cols; x++) {
-	    Cell c = p->at(p->ctx, x, y);
+	    Cell c = src ? src[x] : p->at(p->ctx, x, y);
 	    bg[row + x] = c.bg;
 	    visited[row + x] = (c.r > 0 && c.r < 0x110000) ? 2 : 0;
 	}

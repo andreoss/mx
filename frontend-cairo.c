@@ -1283,8 +1283,9 @@ cairo_frame(void *ctx, const Screen *s,
 	    uint8_t *flags = b->repaint + (size_t) y * cols;
 	    Cell *drow = b->drawn + (size_t) y * cols;
 	    memset(flags, 0, (size_t) cols);
+	    const Cell *srow = screen_row(s, y);
 	    for (x = dx1; x <= dx2; x++) {
-		Cell c = screen_get(s, x, y);
+		Cell c = srow ? srow[x] : screen_get(s, x, y);
 		Cell old = drow[x];
 		drow[x] = c;
 		if (!use_diff || ATTRCMP(c, old) || c.r != old.r)
@@ -2173,7 +2174,7 @@ static void border_cache_refresh(CairoBackend *b, const Screen *s)
     if (!b->border_visited)
 	return;
     ScreenPlaneCtx sp = { s };
-    Plane plane = { &sp, screen_plane_at };
+    Plane plane = { &sp, screen_plane_at, screen_plane_row };
     b->border_cache = region_compute(&plane, b->cols, b->rows,
 				     &b->border_cache_n,
 				     b->border_visited);

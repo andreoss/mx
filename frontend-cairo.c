@@ -111,6 +111,7 @@ struct CairoBackend {
     Argb bg_grad_top;
     int border_gen;
     unsigned border_sig;
+    unsigned border_layout;
     Rect *border_rects;
     int border_rects_n, border_rects_cap;
     uint8_t *border_visited;
@@ -2159,12 +2160,32 @@ is_valid_box(const Screen *s, const Region *r, int cols, int rows)
     return 1;
 }
 
+static unsigned border_layout_hash(const Screen *s, int cols, int rows)
+{
+    unsigned h = 2166136261u;
+    for (int y = 0; y < rows; y++) {
+	const Cell *row = screen_row(s, y);
+	if (!row)
+	    continue;
+	for (int x = 0; x < cols; x++) {
+	    unsigned v = (unsigned) row[x].bg << 1;
+	    v |= row[x].r > 0 && row[x].r < 0x110000;
+	    h = (h ^ v) * 16777619u;
+	}
+    }
+    return h;
+}
+
 static void border_cache_refresh(CairoBackend *b, const Screen *s)
 {
     int gen = screen_border_gen(s);
     if (gen == b->border_gen && b->border_cache)
 	return;
     b->border_gen = gen;
+    unsigned lh = border_layout_hash(s, b->cols, b->rows);
+    if (lh == b->border_layout && b->border_cache)
+	return;
+    b->border_layout = lh;
     free(b->border_cache);
     b->border_cache = NULL;
     b->border_cache_n = 0;

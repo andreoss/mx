@@ -1285,6 +1285,10 @@ cairo_frame(void *ctx, const Screen *s,
 	    Cell *drow = b->drawn + (size_t) y * cols;
 	    memset(flags, 0, (size_t) cols);
 	    const Cell *srow = screen_row(s, y);
+	    if (use_diff && srow
+		&& !memcmp(srow + dx1, drow + dx1,
+			   (size_t) (dx2 - dx1 + 1) * sizeof(Cell)))
+		continue;
 	    for (x = dx1; x <= dx2; x++) {
 		Cell c = srow ? srow[x] : screen_get(s, x, y);
 		Cell old = drow[x];

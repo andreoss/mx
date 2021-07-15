@@ -102,6 +102,7 @@ struct CairoBackend {
     double font_scale;
     ColourCorrection colour_cc;
     cairo_surface_t *backbuf;
+    cairo_surface_t *scroll_tmp;
     cairo_t *backcr;
     double flash_alpha;
     int expected_width, expected_height;
@@ -606,6 +607,8 @@ static void cairo_free(void *ctx)
 	cairo_destroy(b->backcr);
     if (b->backbuf)
 	cairo_surface_destroy(b->backbuf);
+    if (b->scroll_tmp)
+	cairo_surface_destroy(b->scroll_tmp);
     if (b->dim_left)
 	cairo_pattern_destroy(b->dim_left);
     if (b->dim_right)
@@ -651,6 +654,10 @@ static void cairo_resize(void *ctx, int cols, int rows)
 
     cairo_surface_t *old_backbuf = b->backbuf;
     cairo_t *old_backcr = b->backcr;
+    if (b->scroll_tmp) {
+	cairo_surface_destroy(b->scroll_tmp);
+	b->scroll_tmp = NULL;
+    }
 
     b->backbuf = cairo_surface_create_similar(b->output,
 					      CAIRO_CONTENT_COLOR,
@@ -1188,6 +1195,49 @@ cairo_frame(void *ctx, const Screen *s,
     LIMIT(dy1, 0, rows - 1);
     LIMIT(dy2, 0, rows - 1);
 
+    int scrolled = 0;
+    int sc_top, sc_bot, sc_n;
+    if (use_diff && !bg_switched && b->backcr && b->backbuf
+	&& screen_scroll_get(s, &sc_top, &sc_bot, &sc_n)
+	&& sc_top >= 0 && sc_bot < rows) {
+	int an = sc_n > 0 ? sc_n : -sc_n;
+	int keep = sc_bot - sc_top + 1 - an;
+	Cell *base = b->drawn + (size_t) sc_top * cols;
+	size_t span = (size_t) keep * cols * sizeof(Cell);
+
+	if (!b->scroll_tmp)
+	    b->scroll_tmp = cairo_surface_create_similar(b->output,
+							 CAIRO_CONTENT_COLOR,
+							 b->expected_width,
+							 b->expected_height);
+	if (b->scroll_tmp
+	    && cairo_surface_status(b->scroll_tmp) == CAIRO_STATUS_SUCCESS) {
+	    if (sc_n > 0)
+		memmove(base, base + (size_t) an * cols, span);
+	    else
+		memmove(base + (size_t) an * cols, base, span);
+
+	    int sy = bp + (sc_n > 0 ? sc_top + an : sc_top) * ch;
+	    int dy = bp + (sc_n > 0 ? sc_top : sc_top + an) * ch;
+	    cairo_t *t = cairo_create(b->scroll_tmp);
+	    cairo_rectangle(t, bp, sy, cols * cw, keep * ch);
+	    cairo_clip(t);
+	    cairo_set_operator(t, CAIRO_OPERATOR_SOURCE);
+	    cairo_set_source_surface(t, b->backbuf, 0, 0);
+	    cairo_paint(t);
+	    cairo_destroy(t);
+
+	    cairo_save(b->backcr);
+	    cairo_rectangle(b->backcr, bp, dy, cols * cw, keep * ch);
+	    cairo_clip(b->backcr);
+	    cairo_set_operator(b->backcr, CAIRO_OPERATOR_SOURCE);
+	    cairo_set_source_surface(b->backcr, b->scroll_tmp, 0, dy - sy);
+	    cairo_paint(b->backcr);
+	    cairo_restore(b->backcr);
+	    scrolled = 1;
+	}
+    }
+
     Region *regions = NULL;
     int nregions = 0, nvalid = 0;
     if (has_dirty && (b->flags & CAIRO_BORDER_BLOCKS)) {
@@ -1723,7 +1773,7 @@ cairo_frame(void *ctx, const Screen *s,
 	cur_px = bp + cx * cw - cm;
 	cur_py = bp + cy * ch - cm;
     }
-    int partial = !sel_changed && !bg_switched && !scaled
+    int partial = !sel_changed && !bg_switched && !scaled && !scrolled
 	&& !(b->flags & CAIRO_FOCUS_DIM) && b->flash_alpha == 0 && b->backbuf != NULL
 	&& !(b->flags & CAIRO_WINDOW_DAMAGED)
 	&& !(b->flags & CAIRO_BORDERS_MOVED);

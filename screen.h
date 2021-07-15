@@ -29,6 +29,7 @@ struct Screen {
     int dirty_x1, dirty_y1, dirty_x2, dirty_y2;
     int dirty_gen;
     int border_gen;
+    int scroll_top, scroll_bot, scroll_n, scroll_state;
 
     unsigned flags;
 
@@ -80,6 +81,7 @@ void screen_dirty_all(Screen *s);
 int screen_border_gen(const Screen *s);
 int screen_dirty_get(const Screen *s, int *x1, int *y1, int *x2, int *y2);
 void screen_clean(Screen *s);
+int screen_scroll_get(const Screen *s, int *top, int *bot, int *n);
 
 
 int screen_has_blink(const Screen *s);

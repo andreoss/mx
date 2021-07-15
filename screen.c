@@ -4,6 +4,7 @@
 #include "screen.h"
 
 static void screen_dirty(Screen *s, int x1, int y1, int x2, int y2);
+static void screen_note_scroll(Screen *s, int top, int bot, int n);
 
 static int cell_has_blink(Cell c)
 {
@@ -231,6 +232,8 @@ void screen_scroll_up(Screen *s, int top, int bot, size_t n)
     if (n > (size_t) (bot - top + 1))
 	n = (size_t) (bot - top + 1);
 
+    screen_note_scroll(s, top, bot, (int) n);
+
     s->border_gen++;
 
     for (int i = top; i <= bot - (int) n; i++) {
@@ -258,6 +261,8 @@ void screen_scroll_down(Screen *s, int top, int bot, size_t n)
 	return;
     if (n > (size_t) (bot - top + 1))
 	n = (size_t) (bot - top + 1);
+
+    screen_note_scroll(s, top, bot, -(int) n);
 
     s->border_gen++;
 
@@ -495,6 +500,41 @@ int screen_dirty_get(const Screen *s, int *x1, int *y1, int *x2, int *y2)
 void screen_clean(Screen *s)
 {
     s->flags &= ~SCREEN_HAS_DIRTY;
+    s->scroll_top = 0;
+    s->scroll_bot = 0;
+    s->scroll_n = 0;
+    s->scroll_state = 0;
+}
+
+static void screen_note_scroll(Screen *s, int top, int bot, int n)
+{
+    if (s->scroll_state < 0)
+	return;
+    if (s->scroll_state == 0) {
+	s->scroll_top = top;
+	s->scroll_bot = bot;
+	s->scroll_n = n;
+	s->scroll_state = 1;
+	return;
+    }
+    if (s->scroll_top != top || s->scroll_bot != bot) {
+	s->scroll_state = -1;
+	return;
+    }
+    s->scroll_n += n;
+}
+
+int screen_scroll_get(const Screen *s, int *top, int *bot, int *n)
+{
+    if (s->scroll_state != 1 || s->scroll_n == 0)
+	return 0;
+    int h = s->scroll_bot - s->scroll_top + 1;
+    if (s->scroll_n >= h || -s->scroll_n >= h)
+	return 0;
+    *top = s->scroll_top;
+    *bot = s->scroll_bot;
+    *n = s->scroll_n;
+    return 1;
 }
 
 int screen_has_blink(const Screen *s)
